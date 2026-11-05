@@ -50,11 +50,29 @@ object Shop {
     const val FREEZE_ID = "freeze"
     val items = listOf(
         ShopItem(FREEZE_ID, "Bloqueio de streak", "Protege seus streaks em um dia perdido", 50, ShopKind.FREEZE),
-        ShopItem("theme_ocean", "Tema Oceano", "Azuis profundos", 100, ShopKind.THEME),
-        ShopItem("theme_forest", "Tema Floresta", "Verdes calmos", 100, ShopKind.THEME),
-        ShopItem("theme_plum", "Tema Ameixa", "Roxos vibrantes", 100, ShopKind.THEME),
+        ShopItem("theme_ocean", "Tema Azul", "Azul profundo com detalhes em branco", 100, ShopKind.THEME),
+        ShopItem("theme_white", "Tema Branco", "Branco limpo com detalhes em roxo", 100, ShopKind.THEME),
+        ShopItem("theme_black", "Tema Preto", "Preto total com detalhes em menta", 100, ShopKind.THEME),
         ShopItem("acc_glasses", "Óculos escuros", "A Faísca fica estilosa", 150, ShopKind.ACCESSORY),
         ShopItem("acc_party", "Chapéu de festa", "Todo dia é uma comemoração", 150, ShopKind.ACCESSORY),
         ShopItem("acc_crown", "Coroa", "Para quem mantém o ritmo", 300, ShopKind.ACCESSORY),
     )
+}
+
+data class IconGroup(val name: String, val icons: List<String>)
+
+/** Ícones de objetivos e listas, separados por assunto para serem fáceis de achar. */
+object IconCatalog {
+    val groups = listOf(
+        IconGroup("Saúde", listOf("💧", "🏃", "🚶", "🏋️", "🚴", "🏊", "🧘", "🥗", "🍎", "💊", "🛏️", "🦷", "❤️", "🧠", "🚭", "⚖️", "👟", "💉")),
+        IconGroup("Estudo", listOf("📚", "📖", "✍️", "📝", "🎓", "🔬", "🌍", "🗣️", "🎧", "💡", "📐", "🔤", "🖊️", "📓", "🎒", "🏫", "🔭", "📜")),
+        IconGroup("Trabalho", listOf("💻", "💼", "📊", "📈", "📅", "⏰", "📞", "📧", "🎯", "✅", "🚀", "💰", "💳", "🏦", "🖨️", "📌", "🗂️", "⌨️")),
+        IconGroup("Casa", listOf("🏠", "🧹", "🍳", "🛒", "🍽️", "🌱", "🐶", "🐱", "🔧", "🚿", "🗑️", "👕", "🛋️", "🔑", "🔌", "🌻", "🚪", "🚗")),
+        IconGroup("Comida", listOf("🥦", "🥕", "🍌", "🍇", "🍗", "🥩", "🐟", "🥚", "🍚", "🍞", "🧀", "🥛", "🍕", "🍔", "🍰", "🍫", "🥤", "☕")),
+        IconGroup("Lazer", listOf("🎸", "🎹", "🎮", "🎨", "📷", "🎬", "🎵", "✈️", "🏖️", "⚽", "🏀", "🎾", "🎲", "🎭", "🎤", "🏕️", "🚢", "🏄")),
+        IconGroup("Bem-estar", listOf("☀️", "🌙", "😊", "🙏", "🌿", "🌸", "📵", "🛁", "🌊", "⭐", "🎁", "🔥", "🌈", "🕯️", "🤝", "👪", "💬", "🏆")),
+    )
+
+    /** Primeiro grupo que contém [icon], para abrir o seletor já no ícone escolhido. */
+    fun groupOf(icon: String) = groups.indexOfFirst { icon in it.icons }.coerceAtLeast(0)
 }

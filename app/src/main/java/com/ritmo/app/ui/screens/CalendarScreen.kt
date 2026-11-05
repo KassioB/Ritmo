@@ -18,8 +18,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,29 +31,32 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.ritmo.app.domain.DayStatus
 import com.ritmo.app.ui.UiState
-import com.ritmo.app.ui.theme.Ice
-import com.ritmo.app.ui.theme.Missed
-import com.ritmo.app.ui.theme.Success
+import com.ritmo.app.ui.components.GroupCard
+import com.ritmo.app.ui.components.PtBr
+import com.ritmo.app.ui.components.SectionBanner
+import com.ritmo.app.ui.theme.BrandColors
+import com.ritmo.app.ui.theme.Ritmo
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
-private val monthFormat = DateTimeFormatter.ofPattern("MMMM 'de' yyyy", Locale.forLanguageTag("pt-BR"))
-private val dayFormat = DateTimeFormatter.ofPattern("d 'de' MMMM", Locale.forLanguageTag("pt-BR"))
+private val monthFormat = DateTimeFormatter.ofPattern("MMMM 'de' yyyy", PtBr)
+private val dayFormat = DateTimeFormatter.ofPattern("d 'de' MMMM", PtBr)
 private val weekLabels = listOf("D", "S", "T", "Q", "Q", "S", "S")
 
-private fun statusColor(status: DayStatus?) = when (status) {
-    DayStatus.DONE -> Success
-    DayStatus.MISSED -> Missed
-    DayStatus.FROZEN -> Ice
+private fun statusColor(brand: BrandColors, status: DayStatus?) = when (status) {
+    DayStatus.DONE -> brand.done
+    DayStatus.MISSED -> brand.missed
+    DayStatus.FROZEN -> brand.freeze
     null -> Color.Transparent
 }
 
@@ -68,81 +71,111 @@ private fun statusLabel(status: DayStatus?) = when (status) {
 fun CalendarScreen(state: UiState) {
     var month by remember { mutableStateOf(YearMonth.from(LocalDate.ofEpochDay(state.today))) }
     var selected by remember { mutableStateOf(state.today) }
+    val brand = Ritmo.brand
+    val perfectDays = state.dayOutcomes.values.count { it == DayStatus.DONE }
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("Calendário", style = MaterialTheme.typography.headlineMedium)
+        SectionBanner(
+            overline = "Calendário",
+            title = when (perfectDays) {
+                0 -> "Seu primeiro dia perfeito está perto"
+                1 -> "1 dia perfeito até agora"
+                else -> "$perfectDays dias perfeitos até agora"
+            },
+        )
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { month = month.minusMonths(1) }) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Mês anterior")
-            }
-            Text(
-                month.format(monthFormat).replaceFirstChar { it.uppercase() },
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(onClick = { month = month.plusMonths(1) }) {
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Próximo mês")
-            }
-        }
-
-        Row(Modifier.fillMaxWidth()) {
-            weekLabels.forEach {
+        GroupCard {
+            Row(
+                Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = { month = month.minusMonths(1) }) {
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowLeft, "Mês anterior")
+                }
                 Text(
-                    it,
-                    Modifier.weight(1f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    fontWeight = FontWeight.Bold,
+                    month.format(monthFormat).replaceFirstChar { it.uppercase() },
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f),
                 )
+                IconButton(onClick = { month = month.plusMonths(1) }) {
+                    Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, "Próximo mês")
+                }
             }
-        }
 
-        val leading = month.atDay(1).dayOfWeek.value % 7
-        val cells: List<Int?> = List(leading) { null } + (1..month.lengthOfMonth()).toList()
-        cells.chunked(7).forEach { week ->
-            Row(Modifier.fillMaxWidth()) {
-                week.forEach { number ->
-                    Box(Modifier.weight(1f).aspectRatio(1f).padding(3.dp), contentAlignment = Alignment.Center) {
-                        if (number != null) {
-                            val day = month.atDay(number).toEpochDay()
-                            DayCell(number, state.dayOutcomes[day], day == state.today, day == selected) {
-                                selected = day
-                            }
-                        }
+            Column(Modifier.padding(horizontal = 10.dp)) {
+                Row(Modifier.fillMaxWidth()) {
+                    weekLabels.forEach {
+                        Text(
+                            it,
+                            Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
                     }
                 }
-                repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
+                Spacer(Modifier.height(6.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Legend(Success, "Perfeito")
-            Legend(Missed, "Incompleto")
-            Legend(Ice, "Bloqueio")
+                val leading = month.atDay(1).dayOfWeek.value % 7
+                val cells: List<Int?> = List(leading) { null } + (1..month.lengthOfMonth()).toList()
+                cells.chunked(7).forEach { week ->
+                    Row(Modifier.fillMaxWidth()) {
+                        week.forEach { number ->
+                            Box(
+                                Modifier.weight(1f).aspectRatio(1f).padding(3.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (number != null) {
+                                    val day = month.atDay(number).toEpochDay()
+                                    DayCell(number, state.dayOutcomes[day], day == state.today, day == selected) {
+                                        selected = day
+                                    }
+                                }
+                            }
+                        }
+                        repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    Modifier.padding(horizontal = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Legend(brand.done, "Perfeito")
+                    Legend(brand.missed, "Incompleto")
+                    Legend(brand.freeze, "Bloqueio")
+                }
+                Spacer(Modifier.height(8.dp))
+            }
         }
 
         val entries = state.records[selected].orEmpty()
-        Text(
-            LocalDate.ofEpochDay(selected).format(dayFormat),
-            style = MaterialTheme.typography.titleMedium,
-        )
-        if (entries.isEmpty()) {
-            Text("Nenhum registro neste dia.")
-        } else {
-            entries.forEach { (title, status) ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(10.dp).background(statusColor(status), CircleShape))
-                    Spacer(Modifier.size(8.dp))
-                    Text(
-                        title + when (status) {
-                            DayStatus.DONE -> " · concluído"
-                            DayStatus.MISSED -> " · perdido"
-                            DayStatus.FROZEN -> " · protegido"
-                        },
-                    )
+        GroupCard(title = LocalDate.ofEpochDay(selected).format(dayFormat)) {
+            Column(
+                Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (entries.isEmpty()) {
+                    Text("Nenhum registro neste dia.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                } else {
+                    entries.forEach { (title, status) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(10.dp).background(statusColor(brand, status), CircleShape))
+                            Spacer(Modifier.size(8.dp))
+                            Text(
+                                title + when (status) {
+                                    DayStatus.DONE -> " · concluído"
+                                    DayStatus.MISSED -> " · perdido"
+                                    DayStatus.FROZEN -> " · protegido"
+                                },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -152,21 +185,33 @@ fun CalendarScreen(state: UiState) {
 
 @Composable
 private fun DayCell(number: Int, status: DayStatus?, isToday: Boolean, isSelected: Boolean, onClick: () -> Unit) {
-    val color = statusColor(status)
+    val brand = Ritmo.brand
     val ring = MaterialTheme.colorScheme.primary
+    val ink = when (status) {
+        DayStatus.DONE, DayStatus.FROZEN -> brand.onDone
+        DayStatus.MISSED -> Color.White
+        null -> MaterialTheme.colorScheme.onSurface
+    }
     Box(
         Modifier
             .fillMaxSize()
-            .background(color.copy(alpha = if (status == null) 0f else 0.85f), CircleShape)
-            .border(if (isToday || isSelected) 2.dp else 0.dp, if (isSelected) ring else ring.copy(alpha = 0.5f), CircleShape)
+            .background(statusColor(brand, status), CircleShape)
+            .then(
+                if (isToday || isSelected) {
+                    Modifier.border(2.5.dp, if (isSelected) ring else ring.copy(alpha = 0.5f), CircleShape)
+                } else {
+                    Modifier
+                },
+            )
+            .clip(CircleShape)
             .clickable(onClick = onClick)
             .semantics { contentDescription = "Dia $number, ${statusLabel(status)}" },
         contentAlignment = Alignment.Center,
     ) {
         Text(
             "$number",
-            color = if (status == null) MaterialTheme.colorScheme.onSurface else Color.White,
-            fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Medium,
+            color = ink,
+            fontWeight = if (isToday) FontWeight.Black else FontWeight.Bold,
         )
     }
 }

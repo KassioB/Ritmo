@@ -8,27 +8,34 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.edit
 import com.ritmo.app.MainActivity
 import com.ritmo.app.R
 import com.ritmo.app.RitmoApp
 import com.ritmo.app.data.Objective
+import com.ritmo.app.domain.ReminderPlan
 import com.ritmo.app.domain.Streaks
 import com.ritmo.app.domain.dias
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.ZoneId
 
+/** Agenda e dispara os lembretes; as regras de horário ficam em [ReminderPlan]. */
 object Reminders {
     private const val CHANNEL = "lembretes"
-    const val EXTRA_ID = "objective_id"
+    private const val PREFS = "lembretes"
+    private const val LAST_CHECK = "ultima_verificacao"
     private const val EVENING_ID = 0L
-    private const val EVENING_MINUTES = 20 * 60
+
+    /** Depois de muito tempo sem verificar (celular desligado), avisos velhos só atrapalham. */
+    private const val MAX_LATE_HOURS = 2L
 
     fun createChannel(context: Context) {
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
@@ -36,65 +43,84 @@ object Reminders {
         )
     }
 
-    /** Alinha os alarmes com os objetivos atuais. Pode ser chamado a qualquer momento. */
-    fun sync(context: Context, objectives: List<Objective>) {
-        objectives.forEach { objective ->
-            if (objective.archivedDay == null && objective.reminderMinutes != null) {
-                schedule(context, objective)
-            } else {
-                alarmManager(context).cancel(pendingIntent(context, objective.id))
-            }
-        }
-        scheduleEvening(context)
-    }
+    /** No Android 12+ tocar na hora exata depende de uma permissão que o usuário concede. */
+    fun canBeExact(context: Context): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            context.getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
 
-    private fun schedule(context: Context, objective: Objective) {
-        val minutes = objective.reminderMinutes ?: return
+    /**
+     * Reprograma o alarme a partir da última verificação, para que um horário ainda não entregue
+     * pelo sistema continue pendente. [edited] recomeça de agora: um lembrete recém-criado para
+     * um horário que já passou não deve tocar.
+     */
+    fun sync(context: Context, objectives: List<Objective>, edited: Boolean = false) {
         val now = LocalDateTime.now()
-        val time = LocalTime.of(minutes / 60, minutes % 60)
-        val next = (0L..7L)
-            .map { LocalDate.now().plusDays(it) }
-            .map { it.atTime(time) }
-            .firstOrNull { it.isAfter(now) && objective.isScheduledOn(it.toLocalDate().toEpochDay()) }
-            ?: return
-        setAlarm(context, objective.id, next)
+        val last = lastCheck(context)
+        val after = if (edited || last == null || last.isAfter(now)) {
+            setLastCheck(context, now)
+            now
+        } else {
+            last
+        }
+        setAlarm(context, ReminderPlan.next(after, objectives))
     }
 
-    private fun scheduleEvening(context: Context) {
-        val time = LocalTime.of(EVENING_MINUTES / 60, 0)
-        val today = LocalDate.now().atTime(time)
-        val next = if (today.isAfter(LocalDateTime.now())) today else today.plusDays(1)
-        setAlarm(context, EVENING_ID, next)
-    }
-
-    private fun setAlarm(context: Context, id: Long, at: LocalDateTime) {
+    private fun setAlarm(context: Context, at: LocalDateTime) {
         val millis = at.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        // Não exige permissão de alarme exato; o sistema pode atrasar alguns minutos.
-        alarmManager(context).setAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            millis,
-            pendingIntent(context, id),
-        )
+        val manager = context.getSystemService(AlarmManager::class.java)
+        val operation = pendingIntent(context)
+        if (canBeExact(context)) {
+            manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, operation)
+        } else {
+            // Sem a permissão, o sistema pode atrasar o disparo em até uma hora.
+            manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, millis, operation)
+        }
     }
 
-    private fun alarmManager(context: Context) = context.getSystemService(AlarmManager::class.java)
+    private fun pendingIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
+        context,
+        0,
+        Intent(context, ReminderReceiver::class.java),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
 
-    private fun pendingIntent(context: Context, id: Long): PendingIntent {
-        val intent = Intent(context, ReminderReceiver::class.java).putExtra(EXTRA_ID, id)
-        return PendingIntent.getBroadcast(
-            context,
-            id.toInt(),
-            intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    private fun lastCheck(context: Context): LocalDateTime? {
+        val millis = prefs(context).getLong(LAST_CHECK, 0L).takeIf { it > 0L } ?: return null
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(millis), ZoneId.systemDefault())
     }
 
-    suspend fun handle(context: Context, id: Long) {
+    private fun setLastCheck(context: Context, at: LocalDateTime) {
+        prefs(context).edit {
+            putLong(LAST_CHECK, at.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
+        }
+    }
+
+    suspend fun handle(context: Context) {
         val repository = (context.applicationContext as RitmoApp).repository
         val state = repository.load() ?: return
-        val today = LocalDate.now().toEpochDay()
+        val now = LocalDateTime.now()
+        val oldest = now.minusHours(MAX_LATE_HOURS)
+        val from = (lastCheck(context) ?: now).let { if (it.isBefore(oldest)) oldest else it }
 
-        if (id == EVENING_ID) {
+        ReminderPlan.between(from, now, state.objectives)
+            .filterNot { state.isDone(it.objective.id, it.at.toLocalDate().toEpochDay()) }
+            // Vários horários vencidos juntos viram um só aviso por objetivo.
+            .distinctBy { it.objective.id }
+            .forEach { due ->
+                val objective = due.objective
+                val streak = Streaks.forObjective(objective.id, state.records).current
+                val detail = if (streak > 0) {
+                    "Sequência atual: ${dias(streak)}. Não deixe esfriar!"
+                } else {
+                    "Bora começar hoje?"
+                }
+                notify(context, objective.id, "${objective.emoji} ${objective.title}", detail)
+            }
+
+        if (ReminderPlan.eveningBetween(from, now)) {
+            val today = LocalDate.now().toEpochDay()
             val streak = state.mainStreak(today).current
             if (state.scheduledOn(today).isNotEmpty() && !state.isComplete(today) && streak > 0) {
                 notify(
@@ -104,15 +130,9 @@ object Reminders {
                     "A Faísca está preocupada. Ainda dá tempo de completar o dia.",
                 )
             }
-        } else {
-            val objective = state.objectives.firstOrNull { it.id == id }
-            if (objective != null && objective.isScheduledOn(today) && !state.isDone(id, today)) {
-                val streak = Streaks.forObjective(id, state.records).current
-                val detail = if (streak > 0) "Sequência atual: ${dias(streak)}. Não deixe esfriar!" else "Bora começar hoje?"
-                notify(context, id, "${objective.emoji} ${objective.title}", detail)
-            }
         }
-        sync(context, state.objectives)
+        setLastCheck(context, now)
+        setAlarm(context, ReminderPlan.next(now, state.objectives))
     }
 
     @SuppressLint("MissingPermission")
@@ -136,17 +156,14 @@ object Reminders {
                 .build(),
         )
     }
-
 }
 
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val id = intent.getLongExtra(Reminders.EXTRA_ID, -1)
-        if (id < 0) return
         val pending = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                Reminders.handle(context, id)
+                Reminders.handle(context)
             } finally {
                 pending.finish()
             }

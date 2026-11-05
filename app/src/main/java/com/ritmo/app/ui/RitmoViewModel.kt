@@ -4,10 +4,14 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ritmo.app.RitmoApp
+import com.ritmo.app.data.Checklist
+import com.ritmo.app.data.ChecklistItem
 import com.ritmo.app.data.Objective
 import com.ritmo.app.data.Snapshot
+import com.ritmo.app.data.ToggleOutcome
 import com.ritmo.app.domain.Achievement
 import com.ritmo.app.domain.DayStatus
+import com.ritmo.app.domain.Difficulty
 import com.ritmo.app.domain.LevelInfo
 import com.ritmo.app.domain.Progression
 import com.ritmo.app.domain.ShopItem
@@ -31,10 +35,16 @@ import java.time.LocalTime
 
 data class ObjectiveRow(val objective: Objective, val done: Boolean, val streak: Streak)
 
+data class ListRow(val list: Checklist, val pending: List<ChecklistItem>, val done: List<ChecklistItem>) {
+    val total get() = pending.size + done.size
+    val progress get() = if (total == 0) 0f else done.size.toFloat() / total
+}
+
 data class UiState(
     val today: Long,
     val todayRows: List<ObjectiveRow>,
     val otherRows: List<ObjectiveRow>,
+    val lists: List<ListRow>,
     val mainStreak: Streak,
     val complete: Boolean,
     val level: LevelInfo,
@@ -73,75 +83,120 @@ class RitmoViewModel(application: Application) : AndroidViewModel(application) {
             refreshDay()
             while (true) {
                 delay(60_000)
-                refreshDay()
+                closeDays()
             }
         }
     }
 
-    /** Chamado ao abrir o app e a cada minuto, para fechar o dia mesmo com o app aberto na virada. */
+    /** Chamado ao abrir o app e ao voltar para ele. */
     fun refreshDay() {
         viewModelScope.launch {
-            val day = currentDay()
-            today.value = day
-            val closing = repository.closePastDays(day)
-            val frozen = closing.frozenDays
-            if (frozen.isNotEmpty()) {
-                val text = if (frozen.size == 1) "um bloqueio salvou" else "${frozen.size} bloqueios salvaram"
-                eventChannel.send(
-                    AppEvent.Celebrate(
-                        Celebration("Ufa!", "Você perdeu um dia, mas $text seus streaks.", confetti = false),
-                    ),
-                )
-            }
-            closing.achievements.forEach { announce(it) }
+            closeDays()
             syncReminders()
         }
     }
 
-    fun toggle(objectiveId: Long) {
-        viewModelScope.launch {
-            val outcome = repository.toggle(objectiveId, today.value)
-            if (outcome.xp > 0) {
-                val coins = when {
-                    outcome.coins == 1 -> " · +1 moeda"
-                    outcome.coins > 1 -> " · +${outcome.coins} moedas"
-                    else -> ""
-                }
-                eventChannel.send(AppEvent.Reward("+${outcome.xp} XP$coins"))
-            }
-            if (outcome.perfectDay) {
-                val streak = repository.load()?.mainStreak(today.value)?.current ?: 0
-                eventChannel.send(
-                    AppEvent.Celebrate(
-                        Celebration(
-                            "Dia perfeito!",
-                            "${dias(streak)} de streak. " +
-                                "Bônus de ${Progression.PERFECT_DAY_XP} XP e ${Progression.PERFECT_DAY_COINS} moedas.",
-                        ),
-                    ),
-                )
-            }
-            outcome.newLevel?.let {
-                eventChannel.send(
-                    AppEvent.Celebrate(Celebration("Nível $it!", "Você subiu de nível. Continue no ritmo.")),
-                )
-            }
-            outcome.achievements.forEach { announce(it) }
+    /** Roda também a cada minuto, para fechar o dia mesmo com o app aberto na virada. */
+    private suspend fun closeDays() {
+        val day = currentDay()
+        today.value = day
+        val closing = repository.closePastDays(day)
+        val frozen = closing.frozenDays
+        if (frozen.isNotEmpty()) {
+            val text = if (frozen.size == 1) "um bloqueio salvou" else "${frozen.size} bloqueios salvaram"
+            eventChannel.send(
+                AppEvent.Celebrate(
+                    Celebration("Ufa!", "Você perdeu um dia, mas $text seus streaks.", confetti = false),
+                ),
+            )
         }
+        closing.achievements.forEach { announce(it) }
+    }
+
+    fun toggle(objectiveId: Long) {
+        viewModelScope.launch { report(repository.toggle(objectiveId, today.value)) }
+    }
+
+    fun toggleItem(itemId: Long) {
+        viewModelScope.launch { report(repository.toggleItem(itemId, today.value)) }
+    }
+
+    private suspend fun report(outcome: ToggleOutcome) {
+        if (outcome.xp > 0) {
+            val coins = when {
+                outcome.coins == 1 -> " · +1 moeda"
+                outcome.coins > 1 -> " · +${outcome.coins} moedas"
+                else -> ""
+            }
+            eventChannel.send(AppEvent.Reward("+${outcome.xp} XP$coins"))
+        }
+        if (outcome.perfectDay) {
+            val streak = repository.load()?.mainStreak(today.value)?.current ?: 0
+            eventChannel.send(
+                AppEvent.Celebrate(
+                    Celebration(
+                        "Dia perfeito!",
+                        "${dias(streak)} de streak. " +
+                            "Bônus de ${Progression.PERFECT_DAY_XP} XP e ${Progression.PERFECT_DAY_COINS} moedas.",
+                    ),
+                ),
+            )
+        }
+        outcome.finishedList?.let { title ->
+            eventChannel.send(
+                AppEvent.Celebrate(
+                    Celebration(
+                        "Lista completa!",
+                        "Você fechou \"$title\". " +
+                            "Bônus de ${Progression.LIST_COMPLETE_XP} XP e ${Progression.LIST_COMPLETE_COINS} moedas.",
+                    ),
+                ),
+            )
+        }
+        outcome.newLevel?.let {
+            eventChannel.send(
+                AppEvent.Celebrate(Celebration("Nível $it!", "Você subiu de nível. Continue no ritmo.")),
+            )
+        }
+        outcome.achievements.forEach { announce(it) }
     }
 
     fun save(objective: Objective) {
         viewModelScope.launch {
             repository.save(objective, today.value)
-            syncReminders()
+            syncReminders(edited = true)
         }
     }
 
     fun archive(objective: Objective) {
         viewModelScope.launch {
             repository.archive(objective, today.value)
-            syncReminders()
+            syncReminders(edited = true)
         }
+    }
+
+    fun saveList(list: Checklist, onSaved: (Long) -> Unit) {
+        viewModelScope.launch { onSaved(repository.saveList(list)) }
+    }
+
+    fun deleteList(listId: Long) {
+        viewModelScope.launch { repository.deleteList(listId) }
+    }
+
+    fun addItem(listId: Long, title: String, difficulty: Difficulty) {
+        viewModelScope.launch { repository.addItem(listId, title, difficulty) }
+    }
+
+    fun updateItem(item: ChecklistItem) {
+        viewModelScope.launch { repository.updateItem(item) }
+    }
+
+    fun deleteItem(itemId: Long) {
+        viewModelScope.launch { repository.deleteItem(itemId) }
+    }
+
+    fun uncheckAll(listId: Long) {
+        viewModelScope.launch { repository.uncheckAll(listId, today.value) }
     }
 
     fun buy(item: ShopItem) {
@@ -167,9 +222,9 @@ class RitmoViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    private suspend fun syncReminders() {
+    private suspend fun syncReminders(edited: Boolean = false) {
         val state = repository.load() ?: return
-        Reminders.sync(getApplication(), state.objectives)
+        Reminders.sync(getApplication(), state.objectives, edited)
     }
 
     private fun currentDay() = LocalDate.now().toEpochDay()
@@ -198,6 +253,10 @@ private fun Snapshot.toUi(day: Long): UiState {
         today = day,
         todayRows = scheduled.map(::row).sortedBy { it.objective.period.ordinal },
         otherRows = (active - scheduled.toSet()).map(::row),
+        lists = lists.map { list ->
+            val (done, pending) = items.filter { it.listId == list.id }.partition { it.doneDay != null }
+            ListRow(list, pending, done)
+        },
         mainStreak = main,
         complete = complete,
         level = Progression.levelFor(xp),

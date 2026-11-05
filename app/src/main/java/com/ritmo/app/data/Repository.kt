@@ -6,6 +6,7 @@ import com.ritmo.app.domain.Achievements
 import com.ritmo.app.domain.DayCloser
 import com.ritmo.app.domain.DayRecord
 import com.ritmo.app.domain.DayStatus
+import com.ritmo.app.domain.Difficulty
 import com.ritmo.app.domain.Progression
 import com.ritmo.app.domain.ShopItem
 import com.ritmo.app.domain.ShopKind
@@ -23,6 +24,8 @@ data class Snapshot(
     val ledger: List<LedgerEntry>,
     val unlocked: List<UnlockedAchievement>,
     val settings: Settings,
+    val lists: List<Checklist> = emptyList(),
+    val items: List<ChecklistItem> = emptyList(),
 ) {
     val xp get() = ledger.sumOf { it.xp }
     val coins get() = ledger.sumOf { it.coins }
@@ -42,7 +45,7 @@ data class Snapshot(
     fun mainStreak(today: Long): Streak = Streaks.main(records, today, isComplete(today))
 
     fun stats(today: Long) = Stats(
-        completions = records.count { it.status == DayStatus.DONE },
+        completions = records.count { it.status == DayStatus.DONE } + ledger.count { it.key.startsWith(ITEM) },
         perfectDays = ledger.count { it.key.startsWith(PERFECT) },
         bestMainStreak = mainStreak(today).best,
         bestObjectiveStreak = objectives.maxOfOrNull { Streaks.forObjective(it.id, records).best } ?: 0,
@@ -56,6 +59,8 @@ data class Snapshot(
         const val FREEZE_BOUGHT = "freeze-bought:"
         const val PERFECT = "perfect:"
         const val FREEZE_USED = "freeze-used:"
+        const val ITEM = "item:"
+        const val LIST_DONE = "list-done:"
     }
 }
 
@@ -63,6 +68,8 @@ data class ToggleOutcome(
     val xp: Int = 0,
     val coins: Int = 0,
     val perfectDay: Boolean = false,
+    /** Título da lista que acabou de ser concluída por este toque. */
+    val finishedList: String? = null,
     val newLevel: Int? = null,
     val achievements: List<Achievement> = emptyList(),
 )
@@ -75,7 +82,7 @@ data class ClosingOutcome(
 class RitmoRepository(private val db: RitmoDatabase) {
     private val dao = db.dao()
 
-    val snapshot: Flow<Snapshot> = combine(
+    private val routine: Flow<Snapshot> = combine(
         dao.observeObjectives(),
         dao.observeRecords(),
         dao.observeLedger(),
@@ -83,6 +90,10 @@ class RitmoRepository(private val db: RitmoDatabase) {
         dao.observeSettings().filterNotNull(),
     ) { objectives, records, ledger, unlocked, settings ->
         Snapshot(objectives, records.map { it.toDomain() }, ledger, unlocked, settings)
+    }
+
+    val snapshot: Flow<Snapshot> = combine(routine, dao.observeLists(), dao.observeItems()) { state, lists, items ->
+        state.copy(lists = lists, items = items)
     }
 
     suspend fun load(): Snapshot? {
@@ -93,6 +104,8 @@ class RitmoRepository(private val db: RitmoDatabase) {
             dao.ledger(),
             dao.unlocked(),
             settings,
+            dao.lists(),
+            dao.items(),
         )
     }
 
@@ -141,17 +154,30 @@ class RitmoRepository(private val db: RitmoDatabase) {
             )
         }
         syncPerfectDay(today)
-        val achievements = unlockAchievements(today)
-        val after = load() ?: before
-        val oldLevel = Progression.levelFor(before.xp).level
-        val newLevel = Progression.levelFor(after.xp).level
-        ToggleOutcome(
-            xp = after.xp - before.xp,
-            coins = after.coins - before.coins,
-            perfectDay = !before.isComplete(today) && after.isComplete(today),
-            newLevel = newLevel.takeIf { it > oldLevel },
-            achievements = achievements,
-        )
+        outcome(before, today)
+    }
+
+    /**
+     * Mesmo esquema da rotina: cada marcação rende o XP da dificuldade e desmarcar no mesmo dia
+     * devolve. A chave inclui o dia, então uma lista reaproveitada (treino, estudo) volta a
+     * render em outro dia, mas nunca duas vezes no mesmo.
+     */
+    suspend fun toggleItem(itemId: Long, today: Long): ToggleOutcome = db.withTransaction {
+        val item = dao.item(itemId) ?: return@withTransaction ToggleOutcome()
+        val before = load() ?: return@withTransaction ToggleOutcome()
+        val key = itemKey(itemId, today)
+        val wasDone = item.doneDay != null
+
+        if (wasDone) {
+            dao.saveItem(item.copy(doneDay = null))
+            dao.deleteLedger(key)
+        } else {
+            dao.saveItem(item.copy(doneDay = today))
+            dao.addLedger(LedgerEntry(key, item.difficulty.xp, item.difficulty.coins, day = today))
+        }
+        val complete = syncListBonus(item.listId, today)
+        val finished = if (complete && !wasDone) dao.list(item.listId)?.title else null
+        outcome(before, today, finished)
     }
 
     suspend fun save(objective: Objective, today: Long) = db.withTransaction {
@@ -162,6 +188,33 @@ class RitmoRepository(private val db: RitmoDatabase) {
     suspend fun archive(objective: Objective, today: Long) = db.withTransaction {
         dao.saveObjective(objective.copy(archivedDay = today))
         syncPerfectDay(today)
+    }
+
+    suspend fun saveList(list: Checklist): Long = dao.saveList(list)
+
+    /** Excluir a lista não tira o XP já ganho: ele fica no livro-razão. */
+    suspend fun deleteList(listId: Long) = db.withTransaction {
+        dao.deleteItemsOf(listId)
+        dao.deleteList(listId)
+    }
+
+    suspend fun addItem(listId: Long, title: String, difficulty: Difficulty) {
+        dao.saveItem(ChecklistItem(listId = listId, title = title, difficulty = difficulty))
+    }
+
+    suspend fun updateItem(item: ChecklistItem) {
+        dao.saveItem(item)
+    }
+
+    suspend fun deleteItem(itemId: Long) = dao.deleteItem(itemId)
+
+    /** Prepara a lista para ser refeita. O que foi ganho em outros dias continua seu. */
+    suspend fun uncheckAll(listId: Long, today: Long) = db.withTransaction {
+        dao.itemsOf(listId).filter { it.doneDay != null }.forEach { item ->
+            dao.saveItem(item.copy(doneDay = null))
+            dao.deleteLedger(itemKey(item.id, today))
+        }
+        dao.deleteLedger(listDoneKey(listId, today))
     }
 
     /** Devolve as conquistas liberadas pela compra, ou `null` se ela não aconteceu. */
@@ -205,6 +258,25 @@ class RitmoRepository(private val db: RitmoDatabase) {
         }
     }
 
+    private fun itemKey(itemId: Long, day: Long) = "${Snapshot.ITEM}$itemId:$day"
+
+    private fun listDoneKey(listId: Long, day: Long) = "${Snapshot.LIST_DONE}$listId:$day"
+
+    private suspend fun outcome(before: Snapshot, today: Long, finishedList: String? = null): ToggleOutcome {
+        val achievements = unlockAchievements(today)
+        val after = load() ?: before
+        val oldLevel = Progression.levelFor(before.xp).level
+        val newLevel = Progression.levelFor(after.xp).level
+        return ToggleOutcome(
+            xp = after.xp - before.xp,
+            coins = after.coins - before.coins,
+            perfectDay = !before.isComplete(today) && after.isComplete(today),
+            finishedList = finishedList,
+            newLevel = newLevel.takeIf { it > oldLevel },
+            achievements = achievements,
+        )
+    }
+
     private suspend fun syncPerfectDay(today: Long) {
         val state = load() ?: return
         val key = "${Snapshot.PERFECT}$today"
@@ -215,6 +287,21 @@ class RitmoRepository(private val db: RitmoDatabase) {
         } else {
             dao.deleteLedger(key)
         }
+    }
+
+    /** O equivalente ao dia perfeito: bônus ao fechar uma lista, uma vez por dia. */
+    private suspend fun syncListBonus(listId: Long, today: Long): Boolean {
+        val items = dao.itemsOf(listId)
+        val complete = items.size >= Progression.MIN_ITEMS_FOR_LIST_BONUS && items.all { it.doneDay != null }
+        val key = listDoneKey(listId, today)
+        if (complete) {
+            dao.addLedger(
+                LedgerEntry(key, Progression.LIST_COMPLETE_XP, Progression.LIST_COMPLETE_COINS, day = today),
+            )
+        } else {
+            dao.deleteLedger(key)
+        }
+        return complete
     }
 
     private suspend fun unlockAchievements(today: Long): List<Achievement> {

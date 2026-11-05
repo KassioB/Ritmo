@@ -14,57 +14,52 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ritmo.app.domain.Achievement
 import com.ritmo.app.domain.Achievements
 import com.ritmo.app.ui.UiState
+import com.ritmo.app.ui.components.ChunkyProgress
 import com.ritmo.app.ui.components.Faisca
-import com.ritmo.app.ui.theme.Gold
+import com.ritmo.app.ui.components.GroupCard
+import com.ritmo.app.ui.components.SectionBanner
+import com.ritmo.app.ui.theme.Ritmo
 
 @Composable
 fun ProfileScreen(state: UiState) {
+    val brand = Ritmo.brand
+    val unlocked = Achievements.all.count { it.id in state.unlocked }
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Faisca(state.mood, state.accessoryId, sizeDp = 88.dp)
-                    Spacer(Modifier.width(14.dp))
-                    Column {
-                        Text("Nível ${state.level.level}", style = MaterialTheme.typography.headlineMedium)
-                        Spacer(Modifier.height(6.dp))
-                        LinearProgressIndicator(
-                            progress = { state.level.progress },
-                            modifier = Modifier.fillMaxWidth().height(10.dp).clip(CircleShape),
-                            drawStopIndicator = {},
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "${state.level.xpIntoLevel} de ${state.level.xpForNextLevel} XP",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
+            SectionBanner(
+                overline = "Seu progresso",
+                title = "Nível ${state.level.level}",
+                side = { Faisca(state.mood, state.accessoryId, sizeDp = 84.dp) },
+                footer = {
+                    Spacer(Modifier.height(10.dp))
+                    ChunkyProgress(state.level.progress, color = brand.bannerFill, track = brand.bannerLip)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "${state.level.xpIntoLevel} de ${state.level.xpForNextLevel} XP",
+                        color = brand.onBanner,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                },
+            )
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -74,58 +69,61 @@ fun ProfileScreen(state: UiState) {
             }
         }
         item {
-            val count = Achievements.all.count { it.id in state.unlocked }
-            Text(
-                "Conquistas ($count de ${Achievements.all.size})",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
-        items(Achievements.all, key = { it.id }) { achievement ->
-            AchievementRow(achievement, achievement.id in state.unlocked)
+            GroupCard(title = "Conquistas", trailing = "$unlocked de ${Achievements.all.size}") {
+                Achievements.all.forEach { achievement ->
+                    AchievementLine(achievement, achievement.id in state.unlocked)
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun Tile(value: String, label: String, modifier: Modifier) {
-    Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(Modifier.fillMaxWidth().padding(12.dp)) {
-            Text(value, style = MaterialTheme.typography.headlineMedium)
-            Text(label, style = MaterialTheme.typography.bodySmall)
-        }
+    Column(
+        modifier
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(12.dp),
+    ) {
+        Text(value, style = MaterialTheme.typography.headlineMedium)
+        Text(
+            label,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 
 @Composable
-private fun AchievementRow(achievement: Achievement, unlocked: Boolean) {
+private fun AchievementLine(achievement: Achievement, unlocked: Boolean) {
+    val brand = Ritmo.brand
+    val scheme = MaterialTheme.colorScheme
     Row(
-        Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.medium)
-            .padding(12.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
                 .size(44.dp)
-                .background(
-                    if (unlocked) Gold.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceContainerHigh,
-                    CircleShape,
-                ),
+                .background(if (unlocked) brand.done else scheme.surfaceContainerHigh, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                if (unlocked) Icons.Filled.EmojiEvents else Icons.Filled.Lock,
+                if (unlocked) Icons.Rounded.EmojiEvents else Icons.Rounded.Lock,
                 contentDescription = if (unlocked) "Desbloqueada" else "Bloqueada",
-                tint = if (unlocked) Gold else MaterialTheme.colorScheme.outline,
+                tint = if (unlocked) brand.onDone else scheme.onSurfaceVariant,
             )
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(achievement.title, fontWeight = FontWeight.Bold)
-            Text(achievement.description, style = MaterialTheme.typography.bodySmall)
+            Text(achievement.title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                achievement.description,
+                color = scheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
-        Text("+${achievement.coins}", fontWeight = FontWeight.Bold)
+        Text("+${achievement.coins}", style = MaterialTheme.typography.titleMedium)
     }
 }

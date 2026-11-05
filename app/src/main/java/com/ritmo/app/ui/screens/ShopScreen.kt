@@ -1,6 +1,7 @@
 package com.ritmo.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,104 +14,129 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AcUnit
-import androidx.compose.material.icons.filled.MonetizationOn
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.AcUnit
+import androidx.compose.material.icons.rounded.MonetizationOn
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ritmo.app.domain.Progression
 import com.ritmo.app.domain.Shop
 import com.ritmo.app.domain.ShopItem
 import com.ritmo.app.domain.ShopKind
 import com.ritmo.app.ui.UiState
+import com.ritmo.app.ui.components.ChunkyButton
 import com.ritmo.app.ui.components.Faisca
+import com.ritmo.app.ui.components.GroupCard
 import com.ritmo.app.ui.components.Mood
-import com.ritmo.app.ui.components.WalletRow
-import com.ritmo.app.ui.theme.Gold
-import com.ritmo.app.ui.theme.Ice
+import com.ritmo.app.ui.components.SectionBanner
+import com.ritmo.app.ui.theme.Ritmo
+import com.ritmo.app.ui.theme.ThemeSwatches
 
 @Composable
 fun ShopScreen(state: UiState, onBuy: (ShopItem) -> Unit, onToggleEquip: (ShopItem) -> Unit) {
     LazyColumn(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Text("Loja", style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.size(10.dp))
-            WalletRow(state.mainStreak.current, state.coins, state.freezes)
+            SectionBanner(
+                overline = "Loja",
+                title = if (state.coins == 1) "Você tem 1 moeda" else "Você tem ${state.coins} moedas",
+            )
         }
-        items(Shop.items, key = { it.id }) { item ->
-            ShopRow(item, state, onBuy, onToggleEquip)
+        ShopKind.entries.forEach { kind ->
+            val title = when (kind) {
+                ShopKind.FREEZE -> "Proteção"
+                ShopKind.THEME -> "Temas"
+                ShopKind.ACCESSORY -> "Acessórios da Faísca"
+            }
+            item(key = kind) {
+                GroupCard(title = title) {
+                    Shop.items.filter { it.kind == kind }.forEach { item ->
+                        ShopLine(item, state, onBuy, onToggleEquip)
+                    }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun ShopRow(
+private fun ShopLine(
     item: ShopItem,
     state: UiState,
     onBuy: (ShopItem) -> Unit,
     onToggleEquip: (ShopItem) -> Unit,
 ) {
+    val brand = Ritmo.brand
+    val scheme = MaterialTheme.colorScheme
     val owned = item.id in state.owned
     val equipped = item.id == state.themeId || item.id == state.accessoryId
     val atFreezeLimit = item.kind == ShopKind.FREEZE && state.freezes >= Progression.MAX_FREEZES
 
     Row(
-        Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.medium)
-            .padding(12.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
             when (item.kind) {
-                ShopKind.FREEZE -> Icon(Icons.Filled.AcUnit, null, tint = Ice, modifier = Modifier.size(32.dp))
-                ShopKind.THEME -> Icon(
-                    Icons.Filled.Palette,
-                    null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp),
-                )
+                ShopKind.FREEZE -> Icon(Icons.Rounded.AcUnit, null, tint = brand.freeze, modifier = Modifier.size(34.dp))
+                ShopKind.THEME -> Swatches(item.id)
                 ShopKind.ACCESSORY -> Faisca(Mood.HAPPY, item.id, sizeDp = 52.dp)
             }
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(item.name, fontWeight = FontWeight.Bold)
-            Text(item.description, style = MaterialTheme.typography.bodySmall)
+            Text(item.name, style = MaterialTheme.typography.titleMedium)
+            Text(item.description, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             if (item.kind == ShopKind.FREEZE) {
                 Text(
                     "Você tem ${state.freezes} de ${Progression.MAX_FREEZES}",
+                    color = scheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
         Spacer(Modifier.width(8.dp))
         when {
-            owned -> OutlinedButton(onClick = { onToggleEquip(item) }) {
-                Text(if (equipped) "Remover" else "Usar")
-            }
-            else -> Button(
-                onClick = { onBuy(item) },
+            owned -> ChunkyButton(
+                if (equipped) "Remover" else "Usar",
+                { onToggleEquip(item) },
+                color = scheme.surfaceContainerHigh,
+                lip = scheme.outline,
+                contentColor = scheme.onSurface,
+                minHeight = 40.dp,
+                horizontalPadding = 14.dp,
+            )
+            else -> ChunkyButton(
+                "${item.price}",
+                { onBuy(item) },
                 enabled = state.coins >= item.price && !atFreezeLimit,
-            ) {
-                Icon(Icons.Filled.MonetizationOn, "moedas", tint = Gold, modifier = Modifier.size(18.dp))
-                Text(" ${item.price}")
-            }
+                icon = Icons.Rounded.MonetizationOn,
+                minHeight = 40.dp,
+                horizontalPadding = 12.dp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun Swatches(themeId: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
+        ThemeSwatches[themeId].orEmpty().forEach { color ->
+            Box(
+                Modifier
+                    .size(24.dp)
+                    .background(color, CircleShape)
+                    .border(2.dp, MaterialTheme.colorScheme.outline, CircleShape),
+            )
         }
     }
 }

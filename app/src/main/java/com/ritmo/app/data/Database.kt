@@ -11,6 +11,10 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverter
+import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ritmo.app.domain.Difficulty
 import com.ritmo.app.domain.DayRecord
 import com.ritmo.app.domain.DayStatus
@@ -28,7 +32,8 @@ data class Objective(
     val daysMask: Int,
     val difficulty: Difficulty,
     val period: Period,
-    val reminderMinutes: Int?,
+    /** Horários dos lembretes, em minutos desde a meia-noite e em ordem crescente. */
+    val reminders: List<Int> = emptyList(),
     val createdDay: Long,
     /** Objetivos são arquivados, nunca apagados, para o histórico continuar íntegro. */
     val archivedDay: Long? = null,
@@ -78,6 +83,34 @@ data class Settings(
     val accessoryId: String? = null,
 )
 
+/** Lista livre (compras, exercícios, estudos...), independente da rotina diária. */
+@Entity(tableName = "checklists")
+data class Checklist(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    val emoji: String,
+    val colorIndex: Int,
+    val createdDay: Long,
+)
+
+@Entity(tableName = "checklist_items", indices = [Index("listId")])
+data class ChecklistItem(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val listId: Long,
+    val title: String,
+    val difficulty: Difficulty,
+    /** Dia em que foi marcado; nulo enquanto estiver pendente. */
+    val doneDay: Long? = null,
+)
+
+class Converters {
+    @TypeConverter
+    fun fromReminders(reminders: List<Int>): String = reminders.joinToString(",")
+
+    @TypeConverter
+    fun toReminders(value: String): List<Int> = value.split(',').mapNotNull { it.toIntOrNull() }
+}
+
 @Dao
 interface RitmoDao {
     @Query("SELECT * FROM objectives ORDER BY id")
@@ -95,6 +128,12 @@ interface RitmoDao {
     @Query("SELECT * FROM settings WHERE id = 0")
     fun observeSettings(): Flow<Settings?>
 
+    @Query("SELECT * FROM checklists ORDER BY id")
+    fun observeLists(): Flow<List<Checklist>>
+
+    @Query("SELECT * FROM checklist_items ORDER BY id")
+    fun observeItems(): Flow<List<ChecklistItem>>
+
     @Query("SELECT * FROM objectives ORDER BY id")
     suspend fun objectives(): List<Objective>
 
@@ -110,11 +149,26 @@ interface RitmoDao {
     @Query("SELECT * FROM settings WHERE id = 0")
     suspend fun settings(): Settings?
 
+    @Query("SELECT * FROM checklists ORDER BY id")
+    suspend fun lists(): List<Checklist>
+
+    @Query("SELECT * FROM checklist_items ORDER BY id")
+    suspend fun items(): List<ChecklistItem>
+
     @Query("SELECT * FROM objectives WHERE id = :id")
     suspend fun objective(id: Long): Objective?
 
     @Query("SELECT * FROM day_records WHERE objectiveId = :id AND day = :day")
     suspend fun record(id: Long, day: Long): DayRecordRow?
+
+    @Query("SELECT * FROM checklist_items WHERE id = :id")
+    suspend fun item(id: Long): ChecklistItem?
+
+    @Query("SELECT * FROM checklist_items WHERE listId = :listId ORDER BY id")
+    suspend fun itemsOf(listId: Long): List<ChecklistItem>
+
+    @Query("SELECT * FROM checklists WHERE id = :id")
+    suspend fun list(id: Long): Checklist?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveObjective(objective: Objective): Long
@@ -136,6 +190,57 @@ interface RitmoDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveSettings(settings: Settings)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveList(list: Checklist): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveItem(item: ChecklistItem): Long
+
+    @Query("DELETE FROM checklists WHERE id = :id")
+    suspend fun deleteList(id: Long)
+
+    @Query("DELETE FROM checklist_items WHERE listId = :listId")
+    suspend fun deleteItemsOf(listId: Long)
+
+    @Query("DELETE FROM checklist_items WHERE id = :id")
+    suspend fun deleteItem(id: Long)
+}
+
+/**
+ * Versão 2: um objetivo passa a ter vários lembretes e surgem as listas. O SQLite do Android 8
+ * não remove colunas, então `objectives` é recriada; o lembrete antigo vira o primeiro da lista.
+ */
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `objectives_new` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, " +
+                "`emoji` TEXT NOT NULL, `colorIndex` INTEGER NOT NULL, `daysMask` INTEGER NOT NULL, " +
+                "`difficulty` TEXT NOT NULL, `period` TEXT NOT NULL, `reminders` TEXT NOT NULL, " +
+                "`createdDay` INTEGER NOT NULL, `archivedDay` INTEGER)",
+        )
+        db.execSQL(
+            "INSERT INTO `objectives_new` (`id`, `title`, `emoji`, `colorIndex`, `daysMask`, " +
+                "`difficulty`, `period`, `reminders`, `createdDay`, `archivedDay`) " +
+                "SELECT `id`, `title`, `emoji`, `colorIndex`, `daysMask`, `difficulty`, `period`, " +
+                "COALESCE(CAST(`reminderMinutes` AS TEXT), ''), `createdDay`, `archivedDay` " +
+                "FROM `objectives`",
+        )
+        db.execSQL("DROP TABLE `objectives`")
+        db.execSQL("ALTER TABLE `objectives_new` RENAME TO `objectives`")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `checklists` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, " +
+                "`emoji` TEXT NOT NULL, `colorIndex` INTEGER NOT NULL, `createdDay` INTEGER NOT NULL)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `checklist_items` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `listId` INTEGER NOT NULL, " +
+                "`title` TEXT NOT NULL, `difficulty` TEXT NOT NULL, `doneDay` INTEGER)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_checklist_items_listId` ON `checklist_items` (`listId`)")
+    }
 }
 
 @Database(
@@ -145,15 +250,20 @@ interface RitmoDao {
         LedgerEntry::class,
         UnlockedAchievement::class,
         Settings::class,
+        Checklist::class,
+        ChecklistItem::class,
     ],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
+@TypeConverters(Converters::class)
 abstract class RitmoDatabase : RoomDatabase() {
     abstract fun dao(): RitmoDao
 
     companion object {
         fun create(context: Context): RitmoDatabase =
-            Room.databaseBuilder(context, RitmoDatabase::class.java, "ritmo.db").build()
+            Room.databaseBuilder(context, RitmoDatabase::class.java, "ritmo.db")
+                .addMigrations(MIGRATION_1_2)
+                .build()
     }
 }
