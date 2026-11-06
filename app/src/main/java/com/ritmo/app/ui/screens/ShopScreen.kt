@@ -67,6 +67,13 @@ fun ShopScreen(
             SectionBanner(
                 overline = "Loja",
                 title = if (state.coins == 1) "Você tem 1 moeda" else "Você tem ${state.coins} moedas",
+                footer = {
+                    Text(
+                        "Cada dia de streak concluído rende ${state.plan.dailyCoins} moedas.",
+                        color = Ritmo.brand.onBanner,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                },
             )
         }
         if (!state.plan.isPro) {

@@ -1,6 +1,7 @@
 package com.ritmo.app.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -53,10 +54,10 @@ class PetMoodTest {
         assertEquals(LocalDateTime.of(2026, 11, 6, 0, 0), PetMood.nextChange(day.withHour(23).withMinute(59)))
     }
 
-    @Test fun onlyTheFaiscaChangesIconWithTheStage() {
+    @Test fun everyPetChangesIconWithTheStage() {
         assertEquals("Faisca3Worried", PetIcons.alias(null, 3, Mood.WORRIED))
-        assertEquals("MarombaSad", PetIcons.alias(Pets.MAROMBA, 0, Mood.SAD))
-        assertEquals(PetIcons.alias(Pets.RAIO, 0, Mood.HAPPY), PetIcons.alias(Pets.RAIO, 5, Mood.HAPPY))
+        assertEquals("Maromba0Sad", PetIcons.alias(Pets.MAROMBA, 0, Mood.SAD))
+        assertNotEquals(PetIcons.alias(Pets.RAIO, 0, Mood.HAPPY), PetIcons.alias(Pets.RAIO, 5, Mood.HAPPY))
     }
 
     @Test fun everyPetStateHasAnIconAndOnlyOneStartsEnabled() {

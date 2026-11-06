@@ -34,7 +34,13 @@ data class Snapshot(
     val settings: Settings,
     val lists: List<Checklist> = emptyList(),
     val items: List<ChecklistItem> = emptyList(),
+    val account: Account? = null,
 ) {
+    val signedIn get() = account?.signedIn == true
+
+    /** Diferente de não ter conta: quem acabou de atualizar o app ainda não criou a sua. */
+    val signedOut get() = account?.signedIn == false
+
     val xp get() = ledger.sumOf { it.xp }
     val coins get() = ledger.sumOf { it.coins }
     val freezes get() = ledger.sumOf { it.freezes }
@@ -134,8 +140,13 @@ class RitmoRepository(private val db: RitmoDatabase) {
         Snapshot(objectives, records.map { it.toDomain() }, ledger, unlocked, settings)
     }
 
-    val snapshot: Flow<Snapshot> = combine(routine, dao.observeLists(), dao.observeItems()) { state, lists, items ->
-        state.copy(lists = lists, items = items)
+    val snapshot: Flow<Snapshot> = combine(
+        routine,
+        dao.observeLists(),
+        dao.observeItems(),
+        dao.observeAccount(),
+    ) { state, lists, items, account ->
+        state.copy(lists = lists, items = items, account = account)
     }
 
     suspend fun load(): Snapshot? {
@@ -148,6 +159,7 @@ class RitmoRepository(private val db: RitmoDatabase) {
             settings,
             dao.lists(),
             dao.items(),
+            dao.account(),
         )
     }
 
@@ -191,8 +203,7 @@ class RitmoRepository(private val db: RitmoDatabase) {
             dao.deleteLedger(key)
         } else {
             dao.saveRecords(listOf(DayRecordRow(objectiveId, today, DayStatus.DONE)))
-            val coins = objective.difficulty.coins * before.plan.coinMultiplier
-            dao.addLedger(LedgerEntry(key, objective.difficulty.xp, coins, day = today))
+            dao.addLedger(LedgerEntry(key, objective.difficulty.xp, day = today))
         }
         syncPerfectDay(today)
         outcome(before, today)
@@ -201,7 +212,7 @@ class RitmoRepository(private val db: RitmoDatabase) {
     /**
      * Mesmo esquema da rotina: cada marcação rende o XP da dificuldade e desmarcar no mesmo dia
      * devolve. A chave inclui o dia, então uma lista reaproveitada (treino, estudo) volta a
-     * render em outro dia, mas nunca duas vezes no mesmo.
+     * render em outro dia, mas nunca duas vezes no mesmo. Listas não rendem moedas.
      */
     suspend fun toggleItem(itemId: Long, today: Long): ToggleOutcome = db.withTransaction {
         val item = dao.item(itemId) ?: return@withTransaction ToggleOutcome()
@@ -214,8 +225,7 @@ class RitmoRepository(private val db: RitmoDatabase) {
             dao.deleteLedger(key)
         } else {
             dao.saveItem(item.copy(doneDay = today))
-            val coins = item.difficulty.coins * before.plan.coinMultiplier
-            dao.addLedger(LedgerEntry(key, item.difficulty.xp, coins, day = today))
+            dao.addLedger(LedgerEntry(key, item.difficulty.xp, day = today))
         }
         val complete = syncListBonus(item.listId, today)
         val finished = if (complete && !wasDone) dao.list(item.listId)?.title else null
@@ -369,8 +379,7 @@ class RitmoRepository(private val db: RitmoDatabase) {
         val state = load() ?: return
         val key = "${Snapshot.PERFECT}$today"
         if (state.isComplete(today)) {
-            val coins = Progression.PERFECT_DAY_COINS * state.plan.coinMultiplier
-            dao.addLedger(LedgerEntry(key, Progression.PERFECT_DAY_XP, coins, day = today))
+            dao.addLedger(LedgerEntry(key, Progression.PERFECT_DAY_XP, state.plan.dailyCoins, day = today))
         } else {
             dao.deleteLedger(key)
         }
@@ -382,8 +391,7 @@ class RitmoRepository(private val db: RitmoDatabase) {
         val complete = items.size >= Progression.MIN_ITEMS_FOR_LIST_BONUS && items.all { it.doneDay != null }
         val key = listDoneKey(listId, today)
         if (complete) {
-            val coins = Progression.LIST_COMPLETE_COINS * Plan.of(dao.settings()?.isPro == true).coinMultiplier
-            dao.addLedger(LedgerEntry(key, Progression.LIST_COMPLETE_XP, coins, day = today))
+            dao.addLedger(LedgerEntry(key, Progression.LIST_COMPLETE_XP, day = today))
         } else {
             dao.deleteLedger(key)
         }

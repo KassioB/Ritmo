@@ -47,8 +47,8 @@ private fun wave(t: Float, cycles: Int, phase: Float = 0f) =
     sin(2f * PI.toFloat() * (cycles * t + phase))
 
 /**
- * O personagem do usuário, desenhado em uma grade de 100 x 100 unidades. A Faísca muda de forma
- * e de cor a cada fase de evolução; os outros pets crescem e ganham brilho.
+ * O personagem do usuário, desenhado em uma grade de 100 x 100 unidades. Todo pet muda de forma e
+ * de cor a cada fase de evolução. Ao mudar um desenho, atualize tools/generate_pet_icons.py junto.
  */
 @Composable
 fun Mascot(
@@ -509,12 +509,57 @@ private fun DrawScope.faisca(t: Float, stage: Int, mood: Mood) {
     }
 }
 
-/** Pets crescem com o streak e ganham brilho a partir da fase Fogo azul. */
+/** Os pets crescem com o streak; forma e cor mudam por fase, nas tabelas de cada um. */
 private fun petScale(stage: Int) = 0.76f + stage * 0.048f
 
-private val RaioFace = Face(
+private class RaioLook(
+    val light: Color,
+    val mid: Color,
+    val edge: Color,
+    val limb: Color,
+    val iris: Color,
+    val spark: Color,
+)
+
+private val RaioLooks = listOf(
+    RaioLook(Color(0xFFEFEBD0), Color(0xFFC4BD8C), Color(0xFF8C875C), Color(0xFF8C875C), Color(0xFF55512F), Color(0xFF9FB4D6)),
+    RaioLook(Color(0xFFFFFBD6), Color(0xFFFFE45C), Color(0xFFF2B40A), Color(0xFFD99A08), Color(0xFF7A5200), Color(0xFF2F7DFF)),
+    RaioLook(Color(0xFFFFF9C9), Color(0xFFFFD21F), Color(0xFFF59A00), Color(0xFFE88A08), Color(0xFF7A4A00), Color(0xFF2F7DFF)),
+    RaioLook(Color(0xFFFFEDB0), Color(0xFFFFB01F), Color(0xFFEE6E00), Color(0xFFD85E04), Color(0xFF6E3400), Color(0xFF2F7DFF)),
+    RaioLook(Color(0xFFE3F6FF), Color(0xFF5CC8FF), Color(0xFF1E7BF0), Color(0xFF1A63D0), Color(0xFF123A9E), Color(0xFFFFD21F)),
+    RaioLook(Color(0xFFF3EBFF), Color(0xFFAE90FF), Color(0xFF5B3BE8), Color(0xFF4A2FD0), Color(0xFF2A2190), Color(0xFF7FE8FF)),
+)
+
+/** Começa curto e rechonchudo e termina afiado, com um zigue-zague a mais. */
+private val RaioBodies = listOf(
+    floatArrayOf(44f, 10f, 74f, 10f, 63f, 31f, 82f, 31f, 41f, 86f, 49f, 55f, 26f, 55f),
+    floatArrayOf(43f, 6f, 75f, 6f, 63f, 31f, 83f, 31f, 38f, 91f, 48f, 55f, 25f, 55f),
+    floatArrayOf(42f, 3f, 76f, 3f, 63f, 31f, 84f, 31f, 36f, 96f, 47f, 55f, 23f, 55f),
+    floatArrayOf(42f, 3f, 76f, 3f, 63f, 31f, 84f, 31f, 36f, 96f, 47f, 55f, 23f, 55f),
+    floatArrayOf(40f, 1f, 78f, 1f, 64f, 29f, 87f, 29f, 58f, 61f, 69f, 61f, 33f, 99f, 45f, 55f, 21f, 55f),
+    floatArrayOf(40f, 1f, 78f, 1f, 64f, 29f, 87f, 29f, 58f, 61f, 69f, 61f, 33f, 99f, 45f, 55f, 21f, 55f),
+)
+private val RaioEdges = listOf(7f, 6f, 4f, 4f, 3f, 3f)
+private val RaioArcs = listOf(
+    listOf(86f to 12f, 80f to 18f, 87f to 20f, 82f to 27f),
+    listOf(14f to 30f, 20f to 35f, 13f to 39f, 19f to 45f),
+    listOf(74f to 58f, 80f to 62f, 74f to 66f, 80f to 71f),
+)
+
+private fun polygon(points: FloatArray) = Path().apply {
+    moveTo(points[0], points[1])
+    for (index in 2 until points.size step 2) lineTo(points[index], points[index + 1])
+    close()
+}
+
+/** Raiozinho solto ao redor do corpo, na fase final. */
+private fun miniBolt(x: Float, y: Float) = polygon(
+    floatArrayOf(x - 2f, y - 9f, x + 5f, y - 9f, x + 1f, y - 2f, x + 6f, y - 2f, x - 4f, y + 10f, x - 1f, y + 1f, x - 5f, y + 1f),
+)
+
+private fun raioFace(look: RaioLook) = Face(
     Offset(43f, 33f), Offset(63f, 31f), 8.6f, 8f, 5.2f, 1.6f, 0.6f, 0.24f,
-    Color(0xFFFFD21F), Color(0xFF7A4A00), Offset(52f, 46f), 26f,
+    look.mid, look.iris, Offset(52f, 46f), 26f,
 ) {
     val mouth = Path().apply {
         moveTo(40f, 45f)
@@ -535,15 +580,10 @@ private val RaioFace = Face(
 }
 
 private fun DrawScope.raio(t: Float, stage: Int, mood: Mood) {
-    val electric = Color(0xFF2F7DFF)
-    val limb = Color(0xFFE88A08)
-    if (stage >= 4) aura(Color(0xFFFFD21F), 56f, 0.34f)
+    val look = RaioLooks[stage]
+    if (stage >= 4) aura(look.mid, 56f, 0.34f)
     stageTransform(t, petScale(stage), mood) {
-        listOf(
-            listOf(86f to 12f, 80f to 18f, 87f to 20f, 82f to 27f),
-            listOf(14f to 30f, 20f to 35f, 13f to 39f, 19f to 45f),
-            listOf(74f to 58f, 80f to 62f, 74f to 66f, 80f to 71f),
-        ).forEachIndexed { index, points ->
+        RaioArcs.take(stage).forEachIndexed { index, points ->
             val strength = (wave(t, 8, index * 0.3f) + 1.4f) / 2.4f
             val arc = Path().apply {
                 moveTo(points[0].first, points[0].second)
@@ -551,9 +591,14 @@ private fun DrawScope.raio(t: Float, stage: Int, mood: Mood) {
             }
             drawPath(
                 arc,
-                electric.copy(alpha = strength.coerceIn(0f, 1f)),
+                look.spark.copy(alpha = strength.coerceIn(0f, 1f)),
                 style = Stroke(2.2f, cap = StrokeCap.Round, join = StrokeJoin.Round),
             )
+        }
+        if (stage == 5) {
+            val strength = ((wave(t, 6) + 1.4f) / 2.4f).coerceIn(0f, 1f)
+            drawPath(miniBolt(90f, 50f), look.spark.copy(alpha = strength))
+            drawPath(miniBolt(11f, 60f), look.spark.copy(alpha = strength))
         }
         val swing = wave(t, 3) * 1.2f
         val leftArm = Path().apply {
@@ -564,57 +609,75 @@ private fun DrawScope.raio(t: Float, stage: Int, mood: Mood) {
             moveTo(72f, 38f)
             cubicTo(80f, 36f, 86f, 31f, 88f, 26f - swing)
         }
-        drawPath(leftArm, limb, style = Stroke(3f, cap = StrokeCap.Round))
-        drawPath(rightArm, limb, style = Stroke(3f, cap = StrokeCap.Round))
-        drawCircle(limb, 2.6f, Offset(12f, 59f + swing))
-        drawCircle(limb, 2.6f, Offset(88f, 25f - swing))
+        drawPath(leftArm, look.limb, style = Stroke(3f, cap = StrokeCap.Round))
+        drawPath(rightArm, look.limb, style = Stroke(3f, cap = StrokeCap.Round))
+        drawCircle(look.limb, 2.6f, Offset(12f, 59f + swing))
+        drawCircle(look.limb, 2.6f, Offset(88f, 25f - swing))
 
-        val body = Path().apply {
-            moveTo(42f, 3f)
-            lineTo(76f, 3f)
-            lineTo(63f, 31f)
-            lineTo(84f, 31f)
-            lineTo(36f, 96f)
-            lineTo(47f, 55f)
-            lineTo(23f, 55f)
-            close()
-        }
         soft(
-            body,
+            polygon(RaioBodies[stage]),
             Brush.radialGradient(
-                0f to Color(0xFFFFF9C9),
-                0.55f to Color(0xFFFFD21F),
-                1f to Color(0xFFF59A00),
+                0f to look.light,
+                0.55f to look.mid,
+                1f to look.edge,
                 center = Offset(52f, 38f),
                 radius = 60f,
             ),
-            edge = 4f,
+            edge = RaioEdges[stage],
         )
-        curve(50f, 8f, 45f, 16f, 40f, 24f, 2.4f, Color.White.copy(alpha = 0.6f))
-        expression(RaioFace, t, mood)
+        curve(50f, 14f, 45f, 18f, 40f, 24f, 2.4f, Color.White.copy(alpha = 0.6f))
+        expression(raioFace(look), t, mood)
     }
 }
 
-private val LuzFace = Face(
+private class LuzLook(
+    val mid: Color,
+    val edge: Color,
+    val limb: Color,
+    val iris: Color,
+    val ray: Color,
+    val cheek: Color,
+)
+
+private val LuzLooks = listOf(
+    LuzLook(Color(0xFFF1EDD9), Color(0xFFC9C096), Color(0xFFADA47A), Color(0xFF6E6438), Color(0xFFD3CBA4), Color(0xFFD9C9A0)),
+    LuzLook(Color(0xFFFFF6C4), Color(0xFFFFD65C), Color(0xFFEDB93A), Color(0xFFC08000), Color(0xFFFFD766), Color(0xFFFFC27A)),
+    LuzLook(Color(0xFFFFF0A8), Color(0xFFFFB627), Color(0xFFE9A21E), Color(0xFFB56A00), Color(0xFFFFC233), Color(0xFFFFB25A)),
+    LuzLook(Color(0xFFFFE0B8), Color(0xFFFF8F4D), Color(0xFFE8702E), Color(0xFFA8420E), Color(0xFFFF9A52), Color(0xFFFF8A6A)),
+    LuzLook(Color(0xFFCFF0FF), Color(0xFF54B8FF), Color(0xFF2F8CE8), Color(0xFF1557B0), Color(0xFF7FD0FF), Color(0xFF7FB4FF)),
+    LuzLook(Color(0xFFE8DFFF), Color(0xFFA17BFF), Color(0xFF7A55EE), Color(0xFF4A2FB8), Color(0xFFBFA6FF), Color(0xFFB79BFF)),
+)
+private val LuzRays = listOf(4, 4, 8, 8, 12, 12)
+
+/** Alcance dos raios pares e ímpares: com poucos raios, todos têm o mesmo tamanho. */
+private val LuzReach = listOf(45f to 45f, 49f to 49f, 56f to 41f, 58f to 42f, 60f to 44f, 63f to 45f)
+
+private fun luzFace(look: LuzLook) = Face(
     Offset(39f, 49f), Offset(61f, 49f), 8.6f, 9.6f, 6.2f, 1.2f, -1.2f, 0.2f,
-    Color(0xFFFFE9A0), Color(0xFFB56A00), Offset(50f, 65f), 20f,
+    look.mid, look.iris, Offset(50f, 65f), 20f,
 ) {
     curve(41f, 65f, 50f, 73f, 60f, 64f, 2.8f)
 }
 
 /** Uma luz flutuante: orbe suave com um brilho em estrela que gira devagar, sem pernas. */
 private fun DrawScope.luz(t: Float, stage: Int, mood: Mood) {
+    val look = LuzLooks[stage]
     val center = Offset(50f, 52f)
-    val gold = Color(0xFFFFC233)
-    val limb = Color(0xFFE9A21E)
     val pulse = (wave(t, 3) + 1f) / 2f
-    aura(Color(0xFFFFD966), 50f + stage + pulse * 3f, if (stage >= 4) 0.8f else 0.62f, center)
+    val glow = when {
+        stage == 0 -> 0.3f
+        stage >= 4 -> 0.8f
+        else -> 0.62f
+    }
+    aura(look.ray, 50f + stage + pulse * 3f, glow, center)
     stageTransform(t, petScale(stage), mood) {
+        val (longReach, shortReach) = LuzReach[stage]
+        val count = LuzRays[stage]
         rotate(t * 90f, pivot = center) {
-            repeat(8) { index ->
-                val angle = index * PI.toFloat() / 4f
+            repeat(count) { index ->
+                val angle = index * 2f * PI.toFloat() / count
                 val long = index % 2 == 0
-                val reach = if (long) 56f + pulse * 4f else 41f
+                val reach = if (long) longReach + pulse * 4f else shortReach
                 val spread = if (long) 0.09f else 0.06f
                 val ray = Path().apply {
                     moveTo(center.x + 30f * cos(angle - spread), center.y + 30f * sin(angle - spread))
@@ -622,12 +685,14 @@ private fun DrawScope.luz(t: Float, stage: Int, mood: Mood) {
                     lineTo(center.x + 30f * cos(angle + spread), center.y + 30f * sin(angle + spread))
                     close()
                 }
-                drawPath(ray, gold)
+                drawPath(ray, look.ray)
             }
         }
-        listOf(Offset(18f, 16f) to 0f, Offset(85f, 22f) to 0.35f, Offset(84f, 88f) to 0.7f).forEach { (at, phase) ->
+        if (stage >= 4) drawCircle(look.ray, 38f, center, style = Stroke(2f))
+        if (stage == 5) drawCircle(look.ray.copy(alpha = 0.55f), 43f, center, style = Stroke(1.4f))
+        listOf(Offset(18f, 16f) to 0f, Offset(85f, 22f) to 0.35f, Offset(84f, 88f) to 0.7f).take(stage).forEach { (at, phase) ->
             val glint = (wave(t, 3, phase) + 1f) / 2f
-            drawPath(star(at, 2f + glint * 3f), gold.copy(alpha = 0.4f + glint * 0.6f))
+            drawPath(star(at, 2f + glint * 3f), look.ray.copy(alpha = 0.4f + glint * 0.6f))
         }
         val swing = wave(t, 3) * 1.2f
         listOf(false, true).forEach { mirrored ->
@@ -636,29 +701,89 @@ private fun DrawScope.luz(t: Float, stage: Int, mood: Mood) {
                 moveTo(x(18f), 60f)
                 cubicTo(x(12f), 62f, x(10f), 66f, x(11f), 70f + swing)
             }
-            drawPath(arm, limb, style = Stroke(3f, cap = StrokeCap.Round))
-            drawCircle(limb, 2.6f, Offset(x(11f), 71f + swing))
+            drawPath(arm, look.limb, style = Stroke(3f, cap = StrokeCap.Round))
+            drawCircle(look.limb, 2.6f, Offset(x(11f), 71f + swing))
         }
         drawCircle(
             Brush.radialGradient(
                 0f to Color.White,
-                0.55f to Color(0xFFFFF0A8),
-                1f to Color(0xFFFFB627),
+                0.55f to look.mid,
+                1f to look.edge,
                 center = center,
                 radius = 34f,
             ),
             33f,
             center,
         )
-        drawOval(Color(0xFFFFB25A).copy(alpha = 0.55f), Offset(24f, 58f), Size(10f, 6f))
-        drawOval(Color(0xFFFFB25A).copy(alpha = 0.55f), Offset(66f, 58f), Size(10f, 6f))
-        expression(LuzFace, t, mood)
+        drawOval(look.cheek.copy(alpha = 0.55f), Offset(24f, 58f), Size(10f, 6f))
+        drawOval(look.cheek.copy(alpha = 0.55f), Offset(66f, 58f), Size(10f, 6f))
+        expression(luzFace(look), t, mood)
     }
 }
 
-private val MarombaFace = Face(
+private class MarombaLook(
+    val light: Color,
+    val mid: Color,
+    val edge: Color,
+    val muscle: Color,
+    val arm: Color,
+    val fist: Color,
+    val bulge: Color,
+    val highlight: Color,
+    val foot: Color,
+    val iris: Color,
+)
+
+private val MarombaLooks = listOf(
+    MarombaLook(
+        Color(0xFFDAD7DF), Color(0xFF9A95A8), Color(0xFF66617A), Color(0xFF55506A), Color(0xFF8A85A0),
+        Color(0xFF7A7590), Color(0xFFA8A3B8), Color(0xFFE6E3EC), Color(0xFF45405A), Color(0xFF3B3D63),
+    ),
+    MarombaLook(
+        Color(0xFFFFF0A0), Color(0xFFFFA32B), Color(0xFFD9640A), Color(0xFFB4530A), Color(0xFFF08A1A),
+        Color(0xFFE0780F), Color(0xFFFFB84D), Color(0xFFFFE9A8), Color(0xFF8A4204), Color(0xFF7A3E12),
+    ),
+    MarombaLook(
+        Color(0xFFFFE08A), Color(0xFFFF5A1F), Color(0xFFB9130A), Color(0xFFA81208), Color(0xFFF0401A),
+        Color(0xFFE5340F), Color(0xFFFF7A3D), Color(0xFFFFD08A), Color(0xFF7E0E06), Color(0xFF6E1A08),
+    ),
+    MarombaLook(
+        Color(0xFFFFC8B0), Color(0xFFE8264A), Color(0xFF8E0E3A), Color(0xFF7A0A32), Color(0xFFD81E48),
+        Color(0xFFC0183E), Color(0xFFF0506E), Color(0xFFFFC8CE), Color(0xFF5E0826), Color(0xFF5E0A2C),
+    ),
+    MarombaLook(
+        Color(0xFFC8EAFF), Color(0xFF2F8CFF), Color(0xFF1546C9), Color(0xFF123A9E), Color(0xFF2F7DFF),
+        Color(0xFF1F63E0), Color(0xFF5CA8FF), Color(0xFFC8EAFF), Color(0xFF0E2E80), Color(0xFF123A9E),
+    ),
+    MarombaLook(
+        Color(0xFFE8DFFF), Color(0xFF7A5BFF), Color(0xFF2C2EC9), Color(0xFF2A2190), Color(0xFF6F5BFF),
+        Color(0xFF5B45E8), Color(0xFF9C86FF), Color(0xFFE8DFFF), Color(0xFF211A78), Color(0xFF2A2190),
+    ),
+)
+
+/** O físico de cada fase; [crown] é quanto a coroa de fogo abaixa enquanto ele ainda é pequeno. */
+private class MarombaBuild(
+    val width: Float,
+    val upper: Float,
+    val fore: Float,
+    val fist: Float,
+    val bulgeX: Float,
+    val bulgeY: Float,
+    val crown: Float,
+)
+
+private val MarombaBuilds = listOf(
+    MarombaBuild(0.86f, 8f, 6f, 4.6f, 5.2f, 4f, 10f),
+    MarombaBuild(0.92f, 10f, 7f, 5.6f, 6.4f, 5f, 6f),
+    MarombaBuild(1f, 13f, 9f, 7f, 8f, 6.6f, 0f),
+    MarombaBuild(1f, 14f, 9.5f, 7.2f, 8.6f, 7.2f, 0f),
+    MarombaBuild(1.06f, 15f, 10.5f, 7.8f, 9.6f, 8f, 0f),
+    MarombaBuild(1.1f, 16.5f, 11.5f, 8.4f, 10.8f, 9f, 0f),
+)
+
+private fun marombaFace(look: MarombaLook) = Face(
     Offset(42f, 26f), Offset(58f, 26f), 6.6f, 6f, 3.9f, 1.2f, 0.2f, 0.34f,
-    Color(0xFFFF6A2C), Color(0xFF6E1A08), Offset(50f, 34f), 18f,
+    look.mid, look.iris, Offset(50f, 34f), 18f,
 ) {
     val mouth = Path().apply {
         moveTo(43f, 33.4f)
@@ -678,13 +803,27 @@ private val MarombaFace = Face(
     drawPath(teeth, Color.White)
 }
 
+/** Labareda no ombro, nas fases mais fortes. */
+private fun shoulderFlame(x: Float, side: Float, shift: Float) = Path().apply {
+    val y = 42f
+    moveTo(x, y)
+    cubicTo(x + 5f * side, y - 3f, x + 8f * side, y - 8f, x + 8f * side + shift, y - 15f)
+    cubicTo(x + 3f * side, y - 12f, x, y - 9f, x - 3f * side, y - 4f)
+    close()
+}
+
 /** O fogo mais forte: pose de bíceps duplo, peitoral e abdômen marcados. */
 private fun DrawScope.maromba(t: Float, stage: Int, mood: Mood) {
-    val muscle = Color(0xFFA81208)
+    val look = MarombaLooks[stage]
+    val build = MarombaBuilds[stage]
+    val muscle = look.muscle
     val flicker = Flicker(t, energyOf(mood))
     val flex = (wave(t, 3) + 1f) / 2f
-    if (stage >= 4) aura(Color(0xFFFF5A1F), 56f, 0.38f)
-    if (stage >= 2) embers(t, Color(0xFFFFB25A), stage + 1)
+    fun tx(value: Float) = 50f + (value - 50f) * build.width
+    fun ty(value: Float) = value + build.crown * maxOf(0f, 37f - value) / 37f
+
+    if (stage >= 4) aura(look.mid, 56f, 0.38f)
+    if (stage >= 2) embers(t, look.highlight, stage + 1)
     stageTransform(t, petScale(stage), mood) {
         drawLine(muscle, Offset(42f, 86f), Offset(41f, 95f), 8f, StrokeCap.Round)
         drawLine(muscle, Offset(58f, 86f), Offset(59f, 95f), 8f, StrokeCap.Round)
@@ -694,72 +833,81 @@ private fun DrawScope.maromba(t: Float, stage: Int, mood: Mood) {
                 quadraticTo((from + to) / 2f, 92f, to, 99f)
                 close()
             }
-            drawPath(foot, Color(0xFF7E0E06))
-            drawPath(foot, Color(0xFF7E0E06), style = Stroke(2f, join = StrokeJoin.Round))
+            drawPath(foot, look.foot)
+            drawPath(foot, look.foot, style = Stroke(2f, join = StrokeJoin.Round))
         }
 
         val armBrush = Brush.radialGradient(
-            0f to Color(0xFFFF9A4D),
-            0.55f to Color(0xFFF0401A),
+            0f to look.bulge,
+            0.55f to look.arm,
             1f to muscle,
             center = Offset(50f, 40f),
             radius = 62f,
         )
         listOf(false, true).forEach { mirrored ->
             fun x(value: Float) = if (mirrored) 100f - value else value
+            fun inner(value: Float) = if (mirrored) 100f - tx(value) else tx(value)
+            if (stage >= 4) {
+                val side = if (mirrored) 1f else -1f
+                drawPath(shoulderFlame(inner(27f) + 3f * side, side, flicker.x(if (mirrored) 3 else 4)), look.bulge)
+            }
             val upper = Path().apply {
-                moveTo(x(25f), 47f)
+                moveTo(inner(25f), 47f)
                 cubicTo(x(16f), 48f, x(8f), 52f, x(5f), 46f)
             }
-            drawPath(upper, armBrush, style = Stroke(13f, cap = StrokeCap.Round))
+            drawPath(upper, armBrush, style = Stroke(build.upper, cap = StrokeCap.Round))
             val fore = Path().apply {
                 moveTo(x(4f), 46f)
                 cubicTo(x(2f), 40f, x(4f), 34f, x(8f), 29f)
             }
-            drawPath(fore, armBrush, style = Stroke(9f, cap = StrokeCap.Round))
-            drawCircle(Color(0xFFE5340F), 7f, Offset(x(9f), 25f - flex))
-            val bulge = 6.6f + flex * 1.1f
+            drawPath(fore, armBrush, style = Stroke(build.fore, cap = StrokeCap.Round))
+            drawCircle(look.fist, build.fist, Offset(x(9f), 25f - flex))
+            val bulge = build.bulgeY + flex * 1.1f
             drawOval(
-                Color(0xFFFF7A3D),
-                Offset(x(14f) - 8f, 43f - bulge - flex * 0.4f),
-                Size(16f, bulge * 2f),
+                look.bulge,
+                Offset(x(14f) - build.bulgeX, 43f - bulge - flex * 0.4f),
+                Size(build.bulgeX * 2f, bulge * 2f),
             )
-            curve(x(10f), 42f - flex, x(14f), 38f - flex, x(19f), 41f - flex, 1.8f, Color(0xFFFFD08A).copy(alpha = 0.8f))
+            curve(x(10f), 42f - flex, x(14f), 38f - flex, x(19f), 41f - flex, 1.8f, look.highlight.copy(alpha = 0.8f))
         }
 
         val torso = Path().apply {
-            moveTo(37f, 88f)
-            cubicTo(35f, 78f, 30f, 68f, 24f, 60f)
-            cubicTo(19f, 53f, 19f, 45f, 27f, 41f)
-            cubicTo(30f, 39f, 33f, 39f, 35f, 37f)
-            cubicTo(30f, 29f, 31f, 18f, 38f + flicker.x(0), 10f + flicker.y(0))
-            cubicTo(38f, 17f, 41f, 20f, 46f, 20f)
-            cubicTo(48f, 13f, 52f, 6f, 60f + flicker.x(1), 0f + flicker.y(1))
-            cubicTo(59f, 9f, 62f, 15f, 67f, 18f)
-            cubicTo(69f, 15f, 72f, 12f, 76f + flicker.x(2), 10f + flicker.y(2))
-            cubicTo(75f, 20f, 73f, 30f, 65f, 37f)
-            cubicTo(67f, 39f, 70f, 39f, 73f, 41f)
-            cubicTo(81f, 45f, 81f, 53f, 76f, 60f)
-            cubicTo(70f, 68f, 65f, 78f, 63f, 88f)
+            moveTo(tx(37f), 88f)
+            cubicTo(tx(35f), 78f, tx(30f), 68f, tx(24f), 60f)
+            cubicTo(tx(19f), 53f, tx(19f), 45f, tx(27f), 41f)
+            cubicTo(tx(30f), 39f, tx(33f), 39f, tx(35f), 37f)
+            cubicTo(tx(30f), ty(29f), tx(31f), ty(18f), tx(38f) + flicker.x(0), ty(10f) + flicker.y(0))
+            cubicTo(tx(38f), ty(17f), tx(41f), ty(20f), tx(46f), ty(20f))
+            cubicTo(tx(48f), ty(13f), tx(52f), ty(6f), tx(60f) + flicker.x(1), ty(0f) + flicker.y(1))
+            cubicTo(tx(59f), ty(9f), tx(62f), ty(15f), tx(67f), ty(18f))
+            cubicTo(tx(69f), ty(15f), tx(72f), ty(12f), tx(76f) + flicker.x(2), ty(10f) + flicker.y(2))
+            cubicTo(tx(75f), ty(20f), tx(73f), ty(30f), tx(65f), 37f)
+            cubicTo(tx(67f), 39f, tx(70f), 39f, tx(73f), 41f)
+            cubicTo(tx(81f), 45f, tx(81f), 53f, tx(76f), 60f)
+            cubicTo(tx(70f), 68f, tx(65f), 78f, tx(63f), 88f)
             close()
         }
         soft(
             torso,
             Brush.radialGradient(
-                0f to Color(0xFFFFE08A),
-                0.55f to Color(0xFFFF5A1F),
-                1f to Color(0xFFB9130A),
+                0f to look.light,
+                0.55f to look.mid,
+                1f to look.edge,
                 center = Offset(50f, 54f),
                 radius = 60f,
             ),
         )
-        curve(29f, 50f, 40f, 60f, 49f, 51f, 2.2f, muscle)
-        curve(71f, 50f, 60f, 60f, 51f, 51f, 2.2f, muscle)
+        curve(tx(29f), 50f, 40f, 60f, 49f, 51f, 2.2f, muscle)
+        curve(tx(71f), 50f, 60f, 60f, 51f, 51f, 2.2f, muscle)
         drawLine(muscle, Offset(50f, 52f), Offset(50f, 84f), 1.8f, StrokeCap.Round)
         listOf(64f, 72f).forEach { y ->
             curve(39f, y, 43.5f, y + 2f, 48f, y, 1.8f, muscle)
             curve(52f, y, 56.5f, y + 2f, 61f, y, 1.8f, muscle)
         }
-        expression(MarombaFace, t, mood)
+        if (stage >= 4) {
+            curve(41f, 80f, 44f, 82f, 48f, 80f, 1.8f, muscle)
+            curve(52f, 80f, 56f, 82f, 59f, 80f, 1.8f, muscle)
+        }
+        expression(marombaFace(look), t, mood)
     }
 }

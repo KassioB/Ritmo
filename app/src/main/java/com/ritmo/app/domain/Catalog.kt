@@ -81,8 +81,8 @@ object Shop {
         ShopItem(Pets.MAROMBA, "Maromba", "Fogo bruto que não pula um dia de treino", 300, ShopKind.PET),
         ShopItem("theme_ocean", "Tema Azul", "Azul profundo com detalhes em branco", 100, ShopKind.THEME),
         ShopItem("theme_white", "Tema Branco", "Branco limpo com detalhes em roxo", 100, ShopKind.THEME),
-        ShopItem("theme_black", "Tema Preto", "Preto total com detalhes em menta", 100, ShopKind.THEME),
-        ShopItem("theme_gold", "Tema Ouro", "Noite escura com detalhes dourados", 0, ShopKind.THEME, proOnly = true),
+        ShopItem("theme_black", "Tema Preto", "Preto marcante com detalhes em menta", 100, ShopKind.THEME),
+        ShopItem("theme_gold", "Tema Ouro", "Tons quentes com detalhes dourados", 0, ShopKind.THEME, proOnly = true),
         ShopItem("theme_emerald", "Tema Esmeralda", "Verde profundo e sereno", 0, ShopKind.THEME, proOnly = true),
     )
 

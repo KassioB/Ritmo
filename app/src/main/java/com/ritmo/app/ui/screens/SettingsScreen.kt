@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.ritmo.app.data.Account
 import com.ritmo.app.data.Settings
 import com.ritmo.app.domain.Mood
 import com.ritmo.app.domain.Pet
@@ -62,7 +64,6 @@ import com.ritmo.app.ui.components.ChoiceTile
 import com.ritmo.app.ui.components.GroupCard
 import com.ritmo.app.ui.components.Mascot
 import com.ritmo.app.ui.components.PageTopBar
-import com.ritmo.app.ui.theme.FixedModeThemes
 import java.time.LocalDate
 
 private const val DEFAULT_THEME_NAME = "Ritmo"
@@ -76,6 +77,7 @@ fun SettingsScreen(
     onOpenShop: () -> Unit,
     onOpenPro: (String) -> Unit,
     onExport: (Uri) -> Unit,
+    onSignOut: () -> Unit,
     onBack: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -94,6 +96,7 @@ fun SettingsScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
+                state.account?.let { AccountCard(it, onSignOut) }
                 PlanCard(state.plan) { onOpenPro(ProReason.NONE) }
                 AppearanceCard(state, onChange, onOpenShop, onOpenPro)
                 RemindersCard(settings, onChange) { pickingAlert = true }
@@ -128,6 +131,36 @@ private fun Label(text: String) {
 }
 
 @Composable
+private fun AccountCard(account: Account, onSignOut: () -> Unit) {
+    var confirming by rememberSaveable { mutableStateOf(false) }
+    GroupCard(title = "Conta") {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(account.name, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    account.email,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            TextButton(onClick = { confirming = true }) { Text("Sair") }
+        }
+    }
+    if (confirming) {
+        AlertDialog(
+            onDismissRequest = { confirming = false },
+            title = { Text("Sair da conta?") },
+            text = { Text("Seus dados continuam neste aparelho, mas os lembretes param até você entrar de novo.") },
+            confirmButton = { TextButton(onClick = onSignOut) { Text("Sair") } },
+            dismissButton = { TextButton(onClick = { confirming = false }) { Text("Cancelar") } },
+        )
+    }
+}
+
+@Composable
 private fun PlanCard(plan: Plan, onOpen: () -> Unit) {
     if (plan.isPro) {
         ProPromo("Ritmo Pro ativo", "Limites liberados e moedas em dobro.", onOpen)
@@ -145,7 +178,6 @@ private fun AppearanceCard(
     onOpenPro: (String) -> Unit,
 ) {
     val settings = state.settings
-    val fixedMode = settings.themeId in FixedModeThemes
     GroupCard(title = "Aparência") {
         Label("Modo")
         Row(
@@ -161,14 +193,6 @@ private fun AppearanceCard(
                     Text(mode.label, style = MaterialTheme.typography.labelMedium, maxLines = 1)
                 }
             }
-        }
-        if (fixedMode) {
-            Text(
-                "O tema escolhido tem modo fixo.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp),
-            )
         }
 
         Label("Tema")
@@ -378,14 +402,20 @@ private fun PreferencesCard(settings: Settings, onChange: ((Settings) -> Setting
 
 /** O próprio sistema pergunta onde salvar, então o app não precisa de permissão de arquivos. */
 @Composable
-private fun DataCard(plan: Plan, onExport: (Uri) -> Unit, onOpenPro: (String) -> Unit) {
+internal fun rememberHistoryDownload(onExport: (Uri) -> Unit): () -> Unit {
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { target ->
         if (target != null) onExport(target)
     }
+    return { picker.launch("ritmo-historico-${LocalDate.now()}.csv") }
+}
+
+@Composable
+private fun DataCard(plan: Plan, onExport: (Uri) -> Unit, onOpenPro: (String) -> Unit) {
+    val download = rememberHistoryDownload(onExport)
     GroupCard(title = "Dados") {
         Spacer(Modifier.height(4.dp))
         if (plan.isPro) {
-            ActionLine("Histórico em planilha", "Exportar") { picker.launch("ritmo-historico-${LocalDate.now()}.csv") }
+            ActionLine("Histórico em planilha", "Exportar", download)
         } else {
             ActionLine("Histórico em planilha", "Pro") { onOpenPro(ProReason.EXPORT) }
         }

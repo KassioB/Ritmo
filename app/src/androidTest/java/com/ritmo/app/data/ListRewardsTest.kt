@@ -44,16 +44,19 @@ class ListRewardsTest {
         return state().items.filter { it.listId == id }.map { it.id }
     }
 
-    @Test fun itemsPayTheSameAsTheRoutineForEachDifficulty() = runBlocking {
+    @Test fun itemsPayTheSameXpAsTheRoutineForEachDifficulty() = runBlocking {
         val items = list(Difficulty.EASY, Difficulty.MEDIUM, Difficulty.HARD, Difficulty.MEDIUM)
 
         assertEquals(10, repository.toggleItem(items[0], today).xp)
-        assertEquals(firstStepCoins + 1, state().coins)
         assertEquals(20, repository.toggleItem(items[1], today).xp)
-        assertEquals(firstStepCoins + 3, state().coins)
         assertEquals(30, repository.toggleItem(items[2], today).xp)
         assertEquals(60, state().xp)
-        assertEquals(firstStepCoins + 6, state().coins)
+    }
+
+    @Test fun listsPayNoCoinsEvenWhenFinished() = runBlocking {
+        list(Difficulty.HARD, Difficulty.HARD).forEach { repository.toggleItem(it, today) }
+
+        assertEquals(firstStepCoins, state().coins)
     }
 
     @Test fun uncheckingOnTheSameDayGivesTheRewardBack() = runBlocking {

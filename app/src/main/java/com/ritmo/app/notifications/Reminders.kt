@@ -65,11 +65,12 @@ object Reminders {
         schedule(context, state, after)
     }
 
+    /** Quem saiu da conta deixa de receber avisos até entrar de novo. */
     private fun activeObjectives(state: Snapshot) =
-        if (state.settings.remindersEnabled) state.objectives else emptyList()
+        if (state.settings.remindersEnabled && !state.signedOut) state.objectives else emptyList()
 
     private fun alertMinutes(state: Snapshot) =
-        state.settings.streakAlertMinutes.takeIf { state.settings.streakAlertEnabled }
+        state.settings.streakAlertMinutes.takeIf { state.settings.streakAlertEnabled && !state.signedOut }
 
     private fun schedule(context: Context, state: Snapshot, after: LocalDateTime) {
         val next = ReminderPlan.next(after, activeObjectives(state), alertMinutes(state))

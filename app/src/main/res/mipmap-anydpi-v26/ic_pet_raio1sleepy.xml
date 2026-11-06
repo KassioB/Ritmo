@@ -8,29 +8,27 @@
             <vector android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
                 <group android:scaleX="0.6" android:scaleY="0.6" android:translateX="24" android:translateY="23">
                     <path android:pathData="M86,12 L80,18 L87,20 L82,27" android:strokeColor="#FF2F7DFF" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round" />
-                    <path android:pathData="M14,30 L20,35 L13,39 L19,45" android:strokeColor="#FF2F7DFF" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round" />
-                    <path android:pathData="M74,58 L80,62 L74,66 L80,71" android:strokeColor="#FF2F7DFF" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round" />
-                    <path android:pathData="M26,46 C18,48 13,52 12,58" android:strokeColor="#FFE88A08" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" />
-                    <path android:pathData="M72,38 C80,36 86,31 88,26" android:strokeColor="#FFE88A08" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" />
-                    <path android:pathData="M9.4,59 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" android:fillColor="#FFE88A08" />
-                    <path android:pathData="M85.4,25 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" android:fillColor="#FFE88A08" />
-                    <path android:pathData="M42,3 L76,3 L63,31 L84,31 L36,96 L47,55 L23,55 Z" android:strokeWidth="4" android:strokeLineCap="round" android:strokeLineJoin="round">
+                    <path android:pathData="M26,46 C18,48 13,52 12,58" android:strokeColor="#FFD99A08" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" />
+                    <path android:pathData="M72,38 C80,36 86,31 88,26" android:strokeColor="#FFD99A08" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" />
+                    <path android:pathData="M9.4,59 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" android:fillColor="#FFD99A08" />
+                    <path android:pathData="M85.4,25 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 Z" android:fillColor="#FFD99A08" />
+                    <path android:pathData="M43,6 L75,6 L63,31 L83,31 L38,91 L48,55 L25,55 Z" android:strokeWidth="6" android:strokeLineCap="round" android:strokeLineJoin="round">
                         <aapt:attr name="android:fillColor">
                             <gradient android:type="radial" android:centerX="52" android:centerY="38" android:gradientRadius="60">
-                                    <item android:offset="0" android:color="#FFFFF9C9" />
-                                    <item android:offset="0.55" android:color="#FFFFD21F" />
-                                    <item android:offset="1" android:color="#FFF59A00" />
+                                    <item android:offset="0" android:color="#FFFFFBD6" />
+                                    <item android:offset="0.55" android:color="#FFFFE45C" />
+                                    <item android:offset="1" android:color="#FFF2B40A" />
                             </gradient>
                         </aapt:attr>
                         <aapt:attr name="android:strokeColor">
                             <gradient android:type="radial" android:centerX="52" android:centerY="38" android:gradientRadius="60">
-                                    <item android:offset="0" android:color="#FFFFF9C9" />
-                                    <item android:offset="0.55" android:color="#FFFFD21F" />
-                                    <item android:offset="1" android:color="#FFF59A00" />
+                                    <item android:offset="0" android:color="#FFFFFBD6" />
+                                    <item android:offset="0.55" android:color="#FFFFE45C" />
+                                    <item android:offset="1" android:color="#FFF2B40A" />
                             </gradient>
                         </aapt:attr>
                     </path>
-                    <path android:pathData="M50,8 Q45,16 40,24" android:strokeColor="#99FFFFFF" android:strokeWidth="2.4" android:strokeLineCap="round" android:strokeLineJoin="round" />
+                    <path android:pathData="M50,14 Q45,18 40,24" android:strokeColor="#99FFFFFF" android:strokeWidth="2.4" android:strokeLineCap="round" android:strokeLineJoin="round" />
                     <path android:pathData="M36.808,33 Q43,38 49.192,33" android:strokeColor="#FF1B123F" android:strokeWidth="2.6" android:strokeLineCap="round" android:strokeLineJoin="round" />
                     <path android:pathData="M56.808,31 Q63,36 69.192,31" android:strokeColor="#FF1B123F" android:strokeWidth="2.6" android:strokeLineCap="round" android:strokeLineJoin="round" />
                     <path android:pathData="M49.8,48 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0 Z" android:fillColor="#FF1B123F" />

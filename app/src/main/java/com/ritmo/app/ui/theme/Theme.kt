@@ -49,22 +49,28 @@ private val Sky = Color(0xFF7CC8FF)
 private val Coral = Color(0xFFFF6B8A)
 private val DeepCoral = Color(0xFFD93A63)
 private val Ink = Color(0xFF111114)
+private val Snow = Color(0xFFF5F6FB)
+private val Graphite = Color(0xFF17171B)
+private val GraphiteCard = Color(0xFF232329)
 private val ChartPurple = Color(0xFF8E7DFF)
 private val ChartCoral = Color(0xFFE0446C)
 private val ChartCoralDark = Color(0xFFEE4F78)
 
-// Temas exclusivos do Pro. O par do gráfico é o mesmo nos dois e passa no teste de daltonismo.
+// Temas exclusivos do Pro. O par do gráfico passa no teste de daltonismo em cada fundo.
 private val Gold = Color(0xFFF2C14E)
 private val DeepGold = Color(0xFFC9972B)
+private val InkGold = Color(0xFF8A6410)
 private val Walnut = Color(0xFF14110A)
 private val WalnutCard = Color(0xFF211C10)
 private val Cream = Color(0xFFFFF6E0)
 private val Emerald = Color(0xFF34D399)
 private val DeepEmerald = Color(0xFF0E9F6E)
+private val InkEmerald = Color(0xFF0B7A56)
 private val Pine = Color(0xFF06201A)
 private val PineCard = Color(0xFF0C2E26)
 private val Mist = Color(0xFFE8FFF7)
 private val ChartBlue = Color(0xFF3D9BE9)
+private val ChartDeepBlue = Color(0xFF1F6FEB)
 private val ChartRose = Color(0xFFEE5A78)
 
 /** Cores dos objetivos e das listas; o índice fica salvo, então novas cores entram no fim. */
@@ -249,7 +255,7 @@ private val BlueLight = Look(
         onDone = Color.White,
         doneText = DeepBlue,
         missed = DeepCoral,
-        chartDone = Color(0xFF1F6FEB),
+        chartDone = ChartDeepBlue,
         chartMissed = ChartCoral,
     ),
 )
@@ -277,7 +283,7 @@ private val BlueDark = Look(
     ),
 )
 
-private val White = Look(
+private val WhiteLight = Look(
     scheme(
         dark = false,
         background = Color.White,
@@ -315,7 +321,67 @@ private val White = Look(
     ),
 )
 
-private val Black = Look(
+private val WhiteDark = Look(
+    scheme(
+        dark = true,
+        background = Graphite,
+        card = GraphiteCard,
+        raised = Color(0xFF2E2E35),
+        text = Snow,
+        muted = Color(0xFFB6B7C2),
+        line = Color(0xFF3A3A43),
+        accent = SoftPurple,
+        onAccent = Ink,
+        accentTint = Color(0xFF3B3460),
+        error = Coral,
+    ),
+    WhiteLight.brand.copy(
+        header = Graphite,
+        onHeader = Snow,
+        banner = DeepPurple,
+        bannerLip = Color(0xFF5240C8),
+        bannerSide = GraphiteCard,
+        action = Snow,
+        actionLip = Color(0xFFB6B7C2),
+        onAction = Ink,
+        streak = SoftPurple,
+        freeze = Sky,
+        coin = Mint,
+        level = Snow,
+        done = Snow,
+        onDone = Ink,
+        doneText = Snow,
+        missed = Coral,
+        chartDone = ChartPurple,
+        chartMissed = ChartCoralDark,
+    ),
+)
+
+private val BlackLight = Look(
+    scheme(
+        dark = false,
+        background = Color(0xFFF1F2F4),
+        card = Color.White,
+        raised = Color(0xFFE7E8EC),
+        text = Ink,
+        muted = Color(0xFF5C5F6B),
+        line = Color(0xFFD9DAE0),
+        accent = Ink,
+        onAccent = Color.White,
+        accentTint = Color(0xFFD8FBEF),
+        error = DeepCoral,
+    ),
+    RitmoLight.brand.copy(
+        header = Color.Black,
+        banner = Graphite,
+        bannerLip = Color(0xFF3A3A43),
+        bannerSide = Color(0xFF2B2B31),
+        onAction = Color.Black,
+        onDone = Color.Black,
+    ),
+)
+
+private val BlackDark = Look(
     scheme(
         dark = true,
         background = Color.Black,
@@ -341,7 +407,7 @@ private val Black = Look(
     ),
 )
 
-private val GoldLook = Look(
+private val GoldDark = Look(
     scheme(
         dark = true,
         background = Walnut,
@@ -379,7 +445,29 @@ private val GoldLook = Look(
     ),
 )
 
-private val EmeraldLook = Look(
+private val GoldLight = Look(
+    scheme(
+        dark = false,
+        background = Color(0xFFFFF8E7),
+        card = Color.White,
+        raised = Color(0xFFF8EDD2),
+        text = Color(0xFF2B2310),
+        muted = Color(0xFF6B5E40),
+        line = Color(0xFFEBDFC1),
+        accent = InkGold,
+        onAccent = Color.White,
+        accentTint = Color(0xFFFBEBC2),
+        error = DeepCoral,
+    ),
+    GoldDark.brand.copy(
+        doneText = InkGold,
+        missed = DeepCoral,
+        chartDone = ChartDeepBlue,
+        chartMissed = ChartCoral,
+    ),
+)
+
+private val EmeraldDark = Look(
     scheme(
         dark = true,
         background = Pine,
@@ -417,17 +505,36 @@ private val EmeraldLook = Look(
     ),
 )
 
+private val EmeraldLight = Look(
+    scheme(
+        dark = false,
+        background = Color(0xFFECF9F3),
+        card = Color.White,
+        raised = Color(0xFFDAF2E8),
+        text = Pine,
+        muted = Color(0xFF4A6B61),
+        line = Color(0xFFC8E8DC),
+        accent = InkEmerald,
+        onAccent = Color.White,
+        accentTint = Color(0xFFCFF0E3),
+        error = DeepCoral,
+    ),
+    EmeraldDark.brand.copy(
+        doneText = InkEmerald,
+        missed = DeepCoral,
+        chartDone = ChartDeepBlue,
+        chartMissed = ChartCoral,
+    ),
+)
+
 private fun look(themeId: String?, dark: Boolean): Look = when (themeId) {
     "theme_ocean" -> if (dark) BlueDark else BlueLight
-    "theme_white" -> White
-    "theme_black" -> Black
-    "theme_gold" -> GoldLook
-    "theme_emerald" -> EmeraldLook
+    "theme_white" -> if (dark) WhiteDark else WhiteLight
+    "theme_black" -> if (dark) BlackDark else BlackLight
+    "theme_gold" -> if (dark) GoldDark else GoldLight
+    "theme_emerald" -> if (dark) EmeraldDark else EmeraldLight
     else -> if (dark) RitmoDark else RitmoLight
 }
-
-/** Temas de uma cor só: neles a escolha entre claro e escuro não muda nada. */
-val FixedModeThemes = setOf("theme_white", "theme_black", "theme_gold", "theme_emerald")
 
 /** Amostras mostradas na loja para o usuário ver o tema antes de comprar. */
 val ThemeSwatches = mapOf(

@@ -18,6 +18,9 @@ data class Plan(
     val repairPrice: Int,
     val coinMultiplier: Int,
 ) {
+    /** Quanto rende cada dia em que o streak é concluído. */
+    val dailyCoins get() = Progression.PERFECT_DAY_COINS * coinMultiplier
+
     fun canAddObjective(active: Int) = fits(active, maxObjectives)
 
     fun canAddReminder(count: Int) = fits(count, maxRemindersPerObjective)

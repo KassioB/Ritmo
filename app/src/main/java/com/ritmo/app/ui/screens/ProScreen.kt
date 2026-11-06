@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -42,7 +43,7 @@ import com.ritmo.app.ui.components.SectionBanner
 /** O que levou o usuário ao Pro, mostrado no topo da tela. Vazio quando ele veio por conta própria. */
 object ProReason {
     const val NONE = ""
-    const val RANGES = "As visões de mês e ano fazem parte do Pro."
+    const val RANGES = "O calendário e as análises de mês e ano fazem parte do Pro."
     const val THEME = "Este tema é exclusivo do Pro."
     const val EXPORT = "Exportar o histórico faz parte do Pro."
 
@@ -72,12 +73,13 @@ private fun comparisons(): List<Comparison> {
         Comparison("Listas", limit(free.maxLists), limit(pro.maxLists)),
         Comparison("Itens por lista", limit(free.maxItemsPerList), limit(pro.maxItemsPerList)),
         Comparison("Dashboard", "Semana", "Semana, mês e ano"),
+        Comparison("Calendário do streak", "Semana", "Mês e ano"),
         Comparison("Dicas e análises", "Não", "Sim"),
         Comparison("Bloqueios guardados", "${free.maxFreezes}", "${pro.maxFreezes}"),
         Comparison("Bloqueios de presente", "Não", "${pro.monthlyFreezes} por mês"),
         Comparison("Prazo para retomar streak", dias(free.repairWindowDays), dias(pro.repairWindowDays)),
         Comparison("Preço para retomar", "${free.repairPrice} moedas", "${pro.repairPrice} moedas"),
-        Comparison("Moedas ao concluir", "Normal", "Em dobro"),
+        Comparison("Moedas por dia de streak", "${free.dailyCoins}", "${pro.dailyCoins}"),
         Comparison("Temas exclusivos", "Não", "Ouro e Esmeralda"),
         Comparison("Exportar histórico", "Não", "Planilha CSV"),
     )
@@ -89,7 +91,6 @@ fun ProScreen(
     state: UiState,
     reason: String,
     onActivate: () -> Unit,
-    onDeactivate: () -> Unit,
     onClose: () -> Unit,
 ) {
     BackHandler(onBack = onClose)
@@ -115,17 +116,7 @@ fun ProScreen(
                 )
                 if (reason.isNotEmpty() && !pro) LimitNotice(reason)
                 ComparisonCard()
-                if (pro) {
-                    ChunkyButton(
-                        "Voltar ao plano grátis",
-                        onDeactivate,
-                        Modifier.fillMaxWidth(),
-                        color = scheme.surfaceContainerHigh,
-                        lip = scheme.outline,
-                        contentColor = scheme.onSurface,
-                    )
-                    Note("Nada é apagado. O que passar dos limites fica como está, mas não dá para criar mais.")
-                } else {
+                if (!pro) {
                     ChunkyButton("Ativar o Pro", onActivate, Modifier.fillMaxWidth())
                     Note("Versão de testes: ativar é grátis e não há cobrança.")
                 }
@@ -209,26 +200,26 @@ private fun Note(text: String) {
 
 /** Convite discreto para o Pro, sempre com um motivo ligado ao que está na tela. */
 @Composable
-fun ProPromo(title: String, detail: String, onClick: () -> Unit) {
+fun ProPromo(title: String, detail: String, onClick: () -> Unit) =
+    ActionCard(Icons.Rounded.WorkspacePremium, title, detail, "Ver", onClick)
+
+/** Cartão de uma linha com ícone, texto e um botão. */
+@Composable
+fun ActionCard(icon: ImageVector, title: String, detail: String, action: String, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     GroupCard {
         Row(
             Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Icons.Rounded.WorkspacePremium,
-                contentDescription = null,
-                tint = scheme.primary,
-                modifier = Modifier.size(30.dp),
-            )
+            Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(30.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleSmall)
                 Text(detail, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
             Spacer(Modifier.width(10.dp))
-            ChunkyButton("Ver", onClick, minHeight = 40.dp, horizontalPadding = 14.dp)
+            ChunkyButton(action, onClick, minHeight = 40.dp, horizontalPadding = 14.dp)
         }
     }
 }

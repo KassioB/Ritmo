@@ -24,6 +24,11 @@ class PlanTest {
         assertFalse(plan.canAddItem(30))
     }
 
+    @Test fun eachStreakDayPaysFiveCoinsAndProPaysDouble() {
+        assertEquals(5, Plan.FREE.dailyCoins)
+        assertEquals(10, Plan.PRO.dailyCoins)
+    }
+
     @Test fun someoneAboveTheLimitCannotAddMore() {
         assertFalse(Plan.FREE.canAddObjective(9))
         assertFalse(Plan.FREE.canAddReminder(6))

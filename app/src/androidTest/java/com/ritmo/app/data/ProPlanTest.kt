@@ -72,23 +72,49 @@ class ProPlanTest {
 
     private suspend fun earned(key: String) = state().ledger.firstOrNull { it.key == key }?.coins
 
-    @Test fun proDoublesCoinsAndTheBonusAndUndoRemovesThem() = runBlocking {
+    @Test fun proDoublesTheDailyCoinsAndUndoRemovesThem() = runBlocking {
         val id = objective()
         repository.setPro(true, today)
 
         repository.toggle(id, today)
-        assertEquals(2, earned("done:$id:$today"))
         assertEquals(10, earned("${Snapshot.PERFECT}$today"))
 
         repository.toggle(id, today)
-        assertNull(earned("done:$id:$today"))
         assertNull(earned("${Snapshot.PERFECT}$today"))
     }
 
-    @Test fun theFreePlanKeepsNormalCoins() = runBlocking {
+    @Test fun theFreePlanEarnsFiveCoinsPerDay() = runBlocking {
         val id = objective()
         repository.toggle(id, today)
-        assertEquals(1, earned("done:$id:$today"))
+        assertEquals(5, earned("${Snapshot.PERFECT}$today"))
+    }
+
+    @Test fun finishingAnObjectivePaysNoCoinsByItself() = runBlocking {
+        val id = objective(Difficulty.HARD)
+        repository.toggle(id, today)
+        assertEquals(0, earned("done:$id:$today"))
+    }
+
+    @Test fun coinsOnlyComeWhenTheWholeDayIsComplete() = runBlocking {
+        val first = objective()
+        val second = objective()
+
+        repository.toggle(first, today)
+        assertNull(earned("${Snapshot.PERFECT}$today"))
+
+        repository.toggle(second, today)
+        assertEquals(5, earned("${Snapshot.PERFECT}$today"))
+    }
+
+    @Test fun eachDayPaysOnlyOnce() = runBlocking {
+        val id = objective()
+        repeat(3) {
+            repository.toggle(id, today)
+            repository.toggle(id, today)
+        }
+        repository.toggle(id, today)
+
+        assertEquals(1, state().ledger.count { it.key.startsWith(Snapshot.PERFECT) })
         assertEquals(5, earned("${Snapshot.PERFECT}$today"))
     }
 
@@ -100,7 +126,7 @@ class ProPlanTest {
         assertEquals(free, repository.toggle(id, today).xp)
     }
 
-    @Test fun proDoublesListCoins() = runBlocking {
+    @Test fun listsPayNoCoinsEvenOnPro() = runBlocking {
         repository.setPro(true, today)
         val list = repository.saveList(Checklist(title = "Compras", emoji = "🛒", colorIndex = 0, createdDay = today))
         repository.addItem(list, "Arroz", Difficulty.MEDIUM)
@@ -109,9 +135,9 @@ class ProPlanTest {
 
         repository.toggleItem(items[0].id, today)
         repository.toggleItem(items[1].id, today)
-        assertEquals(4, earned("${Snapshot.ITEM}${items[0].id}:$today"))
-        assertEquals(4, earned("${Snapshot.ITEM}${items[1].id}:$today"))
-        assertEquals(10, earned("${Snapshot.LIST_DONE}$list:$today"))
+        assertEquals(0, earned("${Snapshot.ITEM}${items[0].id}:$today"))
+        assertEquals(0, earned("${Snapshot.ITEM}${items[1].id}:$today"))
+        assertEquals(0, earned("${Snapshot.LIST_DONE}$list:$today"))
     }
 
     @Test fun proRepairsAnOlderBreakForHalfThePrice() = runBlocking {

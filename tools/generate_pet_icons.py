@@ -219,72 +219,171 @@ def faisca(stage, mood):
     return limbs(limb, mood) + [P(body, fill=fill, stroke=fill, width=3)] + shine + expression(face_for(stage), mood)
 
 
-def raio(mood):
-    limb = argb("E88A08")
-    electric = argb("2F7DFF")
-    fill = Fill("#FFF9C9", "#FFD21F", "#F59A00", 52, 38, 60)
-    face = Face((43, 33), (63, 31), 8.6, 8, 5.2, 1.6, 0.6, 0.24, "#FFD21F", "#7A4A00", (52, 46), 26, [
+# Cada pet tem 6 aparências, uma por fase: começa apagado e termina azul e violeta, como a Faísca.
+# Claro, meio e borda do corpo, braços, íris, faíscas elétricas.
+RAIO_LOOKS = [
+    ("#EFEBD0", "#C4BD8C", "#8C875C", "#8C875C", "#55512F", "#9FB4D6"),
+    ("#FFFBD6", "#FFE45C", "#F2B40A", "#D99A08", "#7A5200", "#2F7DFF"),
+    ("#FFF9C9", "#FFD21F", "#F59A00", "#E88A08", "#7A4A00", "#2F7DFF"),
+    ("#FFEDB0", "#FFB01F", "#EE6E00", "#D85E04", "#6E3400", "#2F7DFF"),
+    ("#E3F6FF", "#5CC8FF", "#1E7BF0", "#1A63D0", "#123A9E", "#FFD21F"),
+    ("#F3EBFF", "#AE90FF", "#5B3BE8", "#4A2FD0", "#2A2190", "#7FE8FF"),
+]
+RAIO_BODIES = [
+    "M44,10 L74,10 L63,31 L82,31 L41,86 L49,55 L26,55 Z",
+    "M43,6 L75,6 L63,31 L83,31 L38,91 L48,55 L25,55 Z",
+    "M42,3 L76,3 L63,31 L84,31 L36,96 L47,55 L23,55 Z",
+    "M42,3 L76,3 L63,31 L84,31 L36,96 L47,55 L23,55 Z",
+    "M40,1 L78,1 L64,29 L87,29 L58,61 L69,61 L33,99 L45,55 L21,55 Z",
+    "M40,1 L78,1 L64,29 L87,29 L58,61 L69,61 L33,99 L45,55 L21,55 Z",
+]
+RAIO_EDGES = [7, 6, 4, 4, 3, 3]
+RAIO_ARCS = ["M86,12 L80,18 L87,20 L82,27", "M14,30 L20,35 L13,39 L19,45", "M74,58 L80,62 L74,66 L80,71"]
+
+
+def mini_bolt(cx, cy, color):
+    """Raiozinho solto ao redor do corpo, na fase final."""
+    pts = ((-2, -9), (5, -9), (1, -2), (6, -2), (-4, 10), (-1, 1), (-5, 1))
+    return P("M" + " L".join(f"{cx + x:g},{cy + y:g}" for x, y in pts) + " Z", fill=color)
+
+
+def raio(stage, mood):
+    light, mid, edge, limb_color, iris, spark = RAIO_LOOKS[stage]
+    limb = argb(limb_color)
+    electric = argb(spark)
+    fill = Fill(light, mid, edge, 52, 38, 60)
+    face = Face((43, 33), (63, 31), 8.6, 8, 5.2, 1.6, 0.6, 0.24, mid, iris, (52, 46), 26, [
         P("M40,45 Q50,49 64,42 Q61,52 50,52 Q43,51 40,45 Z", fill=INK),
         P("M42.2,45.8 Q50,49.2 61.8,43.5 L60,46.6 Q50,50.4 44,48 Z", fill=WHITE),
     ])
-    out = [P(d, stroke=electric, width=2.2) for d in ("M86,12 L80,18 L87,20 L82,27", "M14,30 L20,35 L13,39 L19,45",
-                                                      "M74,58 L80,62 L74,66 L80,71")]
+    out = [P(d, stroke=electric, width=2.2) for d in RAIO_ARCS[:stage]]
+    if stage == 5:
+        out += [mini_bolt(90, 50, electric), mini_bolt(11, 60, electric)]
     out += [P("M26,46 C18,48 13,52 12,58", stroke=limb, width=3), P("M72,38 C80,36 86,31 88,26", stroke=limb, width=3),
             P(oval(12, 59, 2.6), fill=limb), P(oval(88, 25, 2.6), fill=limb)]
-    out.append(P("M42,3 L76,3 L63,31 L84,31 L36,96 L47,55 L23,55 Z", fill=fill, stroke=fill, width=4))
-    out.append(curve(50, 8, 45, 16, 40, 24, 2.4, argb("FFFFFF", 0.6)))
+    out.append(P(RAIO_BODIES[stage], fill=fill, stroke=fill, width=RAIO_EDGES[stage]))
+    out.append(curve(50, 14, 45, 18, 40, 24, 2.4, argb("FFFFFF", 0.6)))
     return out + expression(face, mood)
 
 
-def luz(mood):
-    limb = argb("E9A21E")
-    gold = argb("FFC233")
+# Centro, meio e borda do orbe, braços, íris, raios, bochecha.
+LUZ_LOOKS = [
+    ("#FFFFFF", "#F1EDD9", "#C9C096", "#ADA47A", "#6E6438", "#D3CBA4", "#D9C9A0"),
+    ("#FFFFFF", "#FFF6C4", "#FFD65C", "#EDB93A", "#C08000", "#FFD766", "#FFC27A"),
+    ("#FFFFFF", "#FFF0A8", "#FFB627", "#E9A21E", "#B56A00", "#FFC233", "#FFB25A"),
+    ("#FFFFFF", "#FFE0B8", "#FF8F4D", "#E8702E", "#A8420E", "#FF9A52", "#FF8A6A"),
+    ("#FFFFFF", "#CFF0FF", "#54B8FF", "#2F8CE8", "#1557B0", "#7FD0FF", "#7FB4FF"),
+    ("#FFFFFF", "#E8DFFF", "#A17BFF", "#7A55EE", "#4A2FB8", "#BFA6FF", "#B79BFF"),
+]
+LUZ_RAYS = [4, 4, 8, 8, 12, 12]
+LUZ_REACH = [(45, 45), (49, 49), (56, 41), (58, 42), (60, 44), (63, 45)]
+
+
+def luz(stage, mood):
+    center, mid, edge, limb_color, iris, ray_color, cheek = LUZ_LOOKS[stage]
+    limb = argb(limb_color)
+    gold = argb(ray_color)
     cx, cy = 50, 52
-    fill = Fill("#FFFFFF", "#FFF0A8", "#FFB627", cx, cy, 34)
-    face = Face((39, 49), (61, 49), 8.6, 9.6, 6.2, 1.2, -1.2, 0.2, "#FFE9A0", "#B56A00", (50, 65), 20,
+    fill = Fill(center, mid, edge, cx, cy, 34)
+    face = Face((39, 49), (61, 49), 8.6, 9.6, 6.2, 1.2, -1.2, 0.2, mid, iris, (50, 65), 20,
                 [curve(41, 65, 50, 73, 60, 64, 2.8)])
+    count = LUZ_RAYS[stage]
+    long_reach, short_reach = LUZ_REACH[stage]
     out = []
-    for i in range(8):
-        angle = i * math.pi / 4
-        reach, spread = (56, 0.09) if i % 2 == 0 else (41, 0.06)
+    for i in range(count):
+        angle = i * 2 * math.pi / count
+        reach, spread = (long_reach, 0.09) if i % 2 == 0 else (short_reach, 0.06)
         pts = [(cx + 30 * math.cos(angle - spread), cy + 30 * math.sin(angle - spread)),
                (cx + reach * math.cos(angle), cy + reach * math.sin(angle)),
                (cx + 30 * math.cos(angle + spread), cy + 30 * math.sin(angle + spread))]
         out.append(P("M" + " L".join(f"{x:.2f},{y:.2f}" for x, y in pts) + " Z", fill=gold))
+    if stage >= 4:
+        out.append(P(oval(cx, cy, 38), stroke=gold, width=2))
+    if stage == 5:
+        out.append(P(oval(cx, cy, 43), stroke=argb(ray_color, 0.55), width=1.4))
     out += [P("M18,60 C12,62 10,66 11,70", stroke=limb, width=3), P("M82,60 C88,62 90,66 89,70", stroke=limb, width=3),
             P(oval(11, 71, 2.6), fill=limb), P(oval(89, 71, 2.6), fill=limb)]
     out.append(P(oval(cx, cy, 33), fill=fill))
-    out += [P(oval(29, 61, 5, 3), fill=argb("FFB25A", 0.55)), P(oval(71, 61, 5, 3), fill=argb("FFB25A", 0.55))]
+    out += [P(oval(29, 61, 5, 3), fill=argb(cheek, 0.55)), P(oval(71, 61, 5, 3), fill=argb(cheek, 0.55))]
     return out + expression(face, mood)
 
 
-def maromba(mood):
-    muscle = argb("A81208")
-    fill = Fill("#FFE08A", "#FF5A1F", "#B9130A", 50, 54, 60)
-    arm = argb("F0401A")
-    face = Face((42, 26), (58, 26), 6.6, 6, 3.9, 1.2, 0.2, 0.34, "#FF6A2C", "#6E1A08", (50, 34), 18, [
+# Claro, meio e borda do tronco, músculo, braço, punho, bíceps, brilho, pé, íris.
+MAROMBA_LOOKS = [
+    ("#DAD7DF", "#9A95A8", "#66617A", "#55506A", "#8A85A0", "#7A7590", "#A8A3B8", "#E6E3EC", "#45405A", "#3B3D63"),
+    ("#FFF0A0", "#FFA32B", "#D9640A", "#B4530A", "#F08A1A", "#E0780F", "#FFB84D", "#FFE9A8", "#8A4204", "#7A3E12"),
+    ("#FFE08A", "#FF5A1F", "#B9130A", "#A81208", "#F0401A", "#E5340F", "#FF7A3D", "#FFD08A", "#7E0E06", "#6E1A08"),
+    ("#FFC8B0", "#E8264A", "#8E0E3A", "#7A0A32", "#D81E48", "#C0183E", "#F0506E", "#FFC8CE", "#5E0826", "#5E0A2C"),
+    ("#C8EAFF", "#2F8CFF", "#1546C9", "#123A9E", "#2F7DFF", "#1F63E0", "#5CA8FF", "#C8EAFF", "#0E2E80", "#123A9E"),
+    ("#E8DFFF", "#7A5BFF", "#2C2EC9", "#2A2190", "#6F5BFF", "#5B45E8", "#9C86FF", "#E8DFFF", "#211A78", "#2A2190"),
+]
+# Por fase: largura do tronco, braço, antebraço, punho, bíceps e quanto a coroa de fogo abaixa.
+MAROMBA_BUILDS = [
+    (0.86, 8, 6, 4.6, (5.2, 4), 10),
+    (0.92, 10, 7, 5.6, (6.4, 5), 6),
+    (1, 13, 9, 7, (8, 6.6), 0),
+    (1, 14, 9.5, 7.2, (8.6, 7.2), 0),
+    (1.06, 15, 10.5, 7.8, (9.6, 8), 0),
+    (1.1, 16.5, 11.5, 8.4, (10.8, 9), 0),
+]
+MAROMBA_TORSO = ((37, 88), (35, 78), (30, 68), (24, 60), (19, 53), (19, 45), (27, 41), (30, 39), (33, 39), (35, 37),
+                 (30, 29), (31, 18), (38, 10), (38, 17), (41, 20), (46, 20), (48, 13), (52, 6), (60, 0), (59, 9),
+                 (62, 15), (67, 18), (69, 15), (72, 12), (76, 10), (75, 20), (73, 30), (65, 37), (67, 39), (70, 39),
+                 (73, 41), (81, 45), (81, 53), (76, 60), (70, 68), (65, 78), (63, 88))
+
+
+def maromba_flame(x, y, side, color):
+    """Labareda no ombro, nas fases mais fortes."""
+    return P(f"M{x:g},{y:g} C{x + 5 * side:g},{y - 3:g} {x + 8 * side:g},{y - 8:g} {x + 8 * side:g},{y - 15:g} "
+             f"C{x + 3 * side:g},{y - 12:g} {x:g},{y - 9:g} {x - 3 * side:g},{y - 4:g} Z", fill=color)
+
+
+def maromba(stage, mood):
+    light, mid, edge, muscle_color, arm_color, fist, bulge, highlight, foot, iris = MAROMBA_LOOKS[stage]
+    width, upper, fore, fist_r, (bulge_x, bulge_y), crown = MAROMBA_BUILDS[stage]
+    muscle = argb(muscle_color)
+    fill = Fill(light, mid, edge, 50, 54, 60)
+    arm = argb(arm_color)
+    face = Face((42, 26), (58, 26), 6.6, 6, 3.9, 1.2, 0.2, 0.34, mid, iris, (50, 34), 18, [
         P("M43,33.4 Q50,36.4 58,32.6 Q56.4,38.6 50,38.6 Q44.6,38.6 43,33.4 Z", fill=INK),
         P("M44.6,34.4 Q50,36.6 56.4,33.8 L55.2,35.8 Q50,37.6 45.8,36 Z", fill=WHITE),
     ])
+
+    def tx(v):
+        return 50 + (v - 50) * width
+
+    def ty(v):
+        return v + crown * max(0, 37 - v) / 37
+
     out = [P("M42,86 L41,95", stroke=muscle, width=8), P("M58,86 L59,95", stroke=muscle, width=8)]
     for a, b in ((34, 46), (54, 66)):
-        out.append(P(f"M{a},99 Q{(a + b) / 2:g},92 {b},99 Z", fill=argb("7E0E06"), stroke=argb("7E0E06"), width=2))
+        out.append(P(f"M{a},99 Q{(a + b) / 2:g},92 {b},99 Z", fill=argb(foot), stroke=argb(foot), width=2))
     for mirrored in (False, True):
         def x(v):
             return 100 - v if mirrored else v
-        out.append(P(f"M{x(25)},47 C{x(16)},48 {x(8)},52 {x(5)},46", stroke=arm, width=13))
-        out.append(P(f"M{x(4)},46 C{x(2)},40 {x(4)},34 {x(8)},29", stroke=arm, width=9))
-        out.append(P(oval(x(9), 25, 7), fill=argb("E5340F")))
-        out.append(P(oval(x(14), 43, 8, 6.6), fill=argb("FF7A3D")))
-        out.append(curve(x(10), 42, x(14), 38, x(19), 41, 1.8, argb("FFD08A", 0.8)))
-    torso = ("M37,88 C35,78 30,68 24,60 C19,53 19,45 27,41 C30,39 33,39 35,37 C30,29 31,18 38,10 C38,17 41,20 46,20 "
-             "C48,13 52,6 60,0 C59,9 62,15 67,18 C69,15 72,12 76,10 C75,20 73,30 65,37 C67,39 70,39 73,41 "
-             "C81,45 81,53 76,60 C70,68 65,78 63,88 Z")
-    out.append(P(torso, fill=fill, stroke=fill, width=3))
-    out += [curve(29, 50, 40, 60, 49, 51, 2.2, muscle), curve(71, 50, 60, 60, 51, 51, 2.2, muscle),
+
+        def inner(v):
+            return 100 - tx(v) if mirrored else tx(v)
+        if stage >= 4:
+            side = 1 if mirrored else -1
+            out.append(maromba_flame(inner(27) + 3 * side, 42, side, argb(bulge)))
+        out.append(P(f"M{inner(25):g},47 C{x(16)},48 {x(8)},52 {x(5)},46", stroke=arm, width=upper))
+        out.append(P(f"M{x(4)},46 C{x(2)},40 {x(4)},34 {x(8)},29", stroke=arm, width=fore))
+        out.append(P(oval(x(9), 25, fist_r), fill=argb(fist)))
+        out.append(P(oval(x(14), 43, bulge_x, bulge_y), fill=argb(bulge)))
+        out.append(curve(x(10), 42, x(14), 38, x(19), 41, 1.8, argb(highlight, 0.8)))
+    spaced = [(tx(px), ty(py)) for px, py in MAROMBA_TORSO]
+    torso = f"M{spaced[0][0]:g},{spaced[0][1]:g} "
+    for i in range(1, len(spaced), 3):
+        (ax, ay), (bx, by), (cx, cy) = spaced[i:i + 3]
+        torso += f"C{ax:g},{ay:g} {bx:g},{by:g} {cx:g},{cy:g} "
+    out.append(P(torso + "Z", fill=fill, stroke=fill, width=3))
+    out += [curve(tx(29), 50, 40, 60, 49, 51, 2.2, muscle), curve(tx(71), 50, 60, 60, 51, 51, 2.2, muscle),
             P("M50,52 L50,84", stroke=muscle, width=1.8)]
     for y in (64, 72):
         out += [curve(39, y, 43.5, y + 2, 48, y, 1.8, muscle), curve(52, y, 56.5, y + 2, 61, y, 1.8, muscle)]
+    if stage >= 4:
+        out += [curve(41, 80, 44, 82, 48, 80, 1.8, muscle), curve(52, 80, 56, 82, 59, 80, 1.8, muscle)]
     return out + expression(face, mood)
 
 
@@ -384,12 +483,10 @@ def nodes_svg(nodes, defs):
 
 
 def combos():
-    for stage in range(6):
-        for mood in MOODS:
-            yield f"Faisca{stage}", stage, mood, lambda s=stage, m=mood: faisca(s, m)
-    for name, draw in (("Raio", raio), ("Luz", luz), ("Maromba", maromba)):
-        for mood in MOODS:
-            yield name, None, mood, lambda d=draw, m=mood: d(m)
+    for name, draw in (("Faisca", faisca), ("Raio", raio), ("Luz", luz), ("Maromba", maromba)):
+        for stage in range(6):
+            for mood in MOODS:
+                yield f"{name}{stage}", mood, lambda d=draw, st=stage, m=mood: d(st, m)
 
 
 def alias_name(pet, mood):
@@ -401,7 +498,7 @@ def main():
     aliases = []
     preview = ['<!doctype html><meta charset="utf-8"><body style="margin:0;background:#EEF;font:12px sans-serif">']
     current = None
-    for pet, stage, mood, draw in combos():
+    for pet, mood, draw in combos():
         nodes = draw()
         key = alias_name(pet, mood)
         file = "ic_pet_" + key.lower()

@@ -47,14 +47,14 @@ object PetMood {
 
 /** Um ícone de app para cada estado do pet; os atalhos vêm de tools/generate_pet_icons.py. */
 object PetIcons {
-    /** A Faísca muda de corpo a cada fase; os outros pets só crescem, então um ícone basta. */
+    /** Todo pet muda de corpo a cada fase, então há um ícone por pet, fase e humor. */
     fun alias(pet: String?, stage: Int, mood: Mood): String {
         val name = when (pet) {
             Pets.RAIO -> "Raio"
             Pets.LUZ -> "Luz"
             Pets.MAROMBA -> "Maromba"
-            else -> "Faisca$stage"
+            else -> "Faisca"
         }
-        return name + mood.name.lowercase().replaceFirstChar { it.uppercase() }
+        return name + stage + mood.name.lowercase().replaceFirstChar { it.uppercase() }
     }
 }

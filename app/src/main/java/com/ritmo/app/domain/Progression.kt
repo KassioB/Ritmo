@@ -1,9 +1,9 @@
 package com.ritmo.app.domain
 
-enum class Difficulty(val label: String, val xp: Int, val coins: Int) {
-    EASY("Fácil", 10, 1),
-    MEDIUM("Médio", 20, 2),
-    HARD("Difícil", 30, 3),
+enum class Difficulty(val label: String, val xp: Int) {
+    EASY("Fácil", 10),
+    MEDIUM("Médio", 20),
+    HARD("Difícil", 30),
 }
 
 enum class Period(val label: String) {
@@ -22,10 +22,12 @@ data class LevelInfo(val level: Int, val xpIntoLevel: Int, val xpForNextLevel: I
 
 object Progression {
     const val PERFECT_DAY_XP = 25
+
+    /** Moedas só vêm de completar o dia do streak e, uma vez cada, das conquistas. */
     const val PERFECT_DAY_COINS = 5
-    /** Fechar uma lista vale o mesmo que um dia perfeito. */
+
+    /** Fechar uma lista rende o mesmo XP de um dia perfeito, mas nenhuma moeda. */
     const val LIST_COMPLETE_XP = PERFECT_DAY_XP
-    const val LIST_COMPLETE_COINS = PERFECT_DAY_COINS
     const val MIN_ITEMS_FOR_LIST_BONUS = 2
     const val STARTING_FREEZES = 1
     const val MAX_FREEZES = 2

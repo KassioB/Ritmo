@@ -5,6 +5,8 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ritmo.app.RitmoApp
+import com.ritmo.app.data.Account
+import com.ritmo.app.data.AuthFailure
 import com.ritmo.app.data.Checklist
 import com.ritmo.app.data.ChecklistItem
 import com.ritmo.app.data.Objective
@@ -85,7 +87,9 @@ data class UiState(
     val mood: Mood,
     val speech: String,
     val streakRepair: StreakRepair?,
+    val account: Account?,
 ) {
+    val signedIn get() = account?.signedIn == true
     val themeId get() = settings.themeId
     val petId get() = settings.petId
     val plan get() = Plan.of(settings.isPro)
@@ -99,6 +103,7 @@ sealed interface AppEvent {
 
 class RitmoViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as RitmoApp).repository
+    private val accounts = (application as RitmoApp).accounts
     private val today = MutableStateFlow(currentDay())
     private val eventChannel = Channel<AppEvent>(Channel.BUFFERED)
 
@@ -130,6 +135,8 @@ class RitmoViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun closeDays() {
         val day = currentDay()
         today.value = day
+        // Os avisos de bloqueio usado e de conquista esperam a pessoa entrar para aparecer.
+        if (repository.load()?.signedIn != true) return
         // Antes de fechar os dias, para o presente do mês já poder salvar um deles.
         val granted = repository.grantMonthlyFreezes(day)
         if (granted > 0) eventChannel.send(AppEvent.Reward("Pro: ${bloqueios(granted)} de presente"))
@@ -164,10 +171,9 @@ class RitmoViewModel(application: Application) : AndroidViewModel(application) {
             eventChannel.send(AppEvent.Reward("+${outcome.xp} XP$coins"))
         }
         val snapshot = repository.load()
-        val coinMultiplier = snapshot?.plan?.coinMultiplier ?: 1
         if (outcome.perfectDay) {
             val streak = snapshot?.mainStreak(today.value)?.current ?: 0
-            val coins = Progression.PERFECT_DAY_COINS * coinMultiplier
+            val coins = snapshot?.plan?.dailyCoins ?: Progression.PERFECT_DAY_COINS
             eventChannel.send(
                 AppEvent.Celebrate(
                     Celebration(
@@ -178,13 +184,9 @@ class RitmoViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         outcome.finishedList?.let { title ->
-            val coins = Progression.LIST_COMPLETE_COINS * coinMultiplier
             eventChannel.send(
                 AppEvent.Celebrate(
-                    Celebration(
-                        "Lista completa!",
-                        "Você fechou \"$title\". Bônus de ${Progression.LIST_COMPLETE_XP} XP e $coins moedas.",
-                    ),
+                    Celebration("Lista completa!", "Você fechou \"$title\". Bônus de ${Progression.LIST_COMPLETE_XP} XP."),
                 ),
             )
         }
@@ -265,19 +267,42 @@ class RitmoViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { repository.toggleEquipped(item) }
     }
 
-    fun setPro(active: Boolean) {
+    fun activatePro() {
         viewModelScope.launch {
-            val granted = repository.setPro(active, today.value)
-            if (active) {
-                val gift = if (granted > 0) " e ${bloqueios(granted)} de presente" else ""
-                eventChannel.send(
-                    AppEvent.Celebrate(
-                        Celebration("Bem-vindo ao Pro!", "Limites liberados, moedas em dobro$gift."),
-                    ),
-                )
-            } else {
-                eventChannel.send(AppEvent.Reward("Você voltou ao plano grátis"))
-            }
+            val granted = repository.setPro(true, today.value)
+            val gift = if (granted > 0) " e ${bloqueios(granted)} de presente" else ""
+            eventChannel.send(
+                AppEvent.Celebrate(Celebration("Bem-vindo ao Pro!", "Limites liberados, moedas em dobro$gift.")),
+            )
+        }
+    }
+
+    fun signUp(name: String, email: String, password: String, onFailure: (AuthFailure) -> Unit) {
+        viewModelScope.launch { finishAuth(accounts.signUp(name, email, password), onFailure) }
+    }
+
+    fun signIn(email: String, password: String, onFailure: (AuthFailure) -> Unit) {
+        viewModelScope.launch { finishAuth(accounts.signIn(email, password), onFailure) }
+    }
+
+    fun resetPassword(email: String, password: String, onFailure: (AuthFailure) -> Unit) {
+        viewModelScope.launch { finishAuth(accounts.resetPassword(email, password), onFailure) }
+    }
+
+    /** Entrar recomeça os lembretes de agora: os horários que passaram com a conta fora não contam. */
+    private suspend fun finishAuth(failure: AuthFailure?, onFailure: (AuthFailure) -> Unit) {
+        if (failure != null) {
+            onFailure(failure)
+            return
+        }
+        closeDays()
+        syncReminders(edited = true)
+    }
+
+    fun signOut() {
+        viewModelScope.launch {
+            accounts.signOut()
+            syncReminders(edited = true)
         }
     }
 
@@ -286,7 +311,7 @@ class RitmoViewModel(application: Application) : AndroidViewModel(application) {
             val state = repository.load() ?: return@launch
             val csv = Export.csv(state.records, state.objectives.associate { it.id to it.title })
             val saved = withContext(Dispatchers.IO) { write(target, csv) }
-            eventChannel.send(AppEvent.Reward(if (saved) "Histórico exportado" else "Não deu para exportar"))
+            eventChannel.send(AppEvent.Reward(if (saved) "Planilha salva" else "Não deu para salvar a planilha"))
         }
     }
 
@@ -384,6 +409,7 @@ private fun Snapshot.toUi(day: Long): UiState {
         mood = feeling.mood,
         speech = feeling.speech,
         streakRepair = streakRepair(day),
+        account = account,
     )
 }
 

@@ -92,6 +92,20 @@ data class Settings(
     val isPro: Boolean = false,
 )
 
+/**
+ * Conta deste aparelho. Só existe uma: [id] é sempre 0, como em [Settings]. Sair não apaga a linha,
+ * só desliga [signedIn]; os dados do app continuam no banco, vinculados a ela.
+ */
+@Entity(tableName = "account")
+data class Account(
+    @PrimaryKey val id: Int = 0,
+    val name: String,
+    val email: String,
+    /** Hash de [com.ritmo.app.domain.Passwords]; nulo se outro serviço autenticar, como o Google. */
+    val password: String?,
+    val signedIn: Boolean,
+)
+
 /** Lista livre (compras, exercícios, estudos...), independente da rotina diária. */
 @Entity(tableName = "checklists")
 data class Checklist(
@@ -122,6 +136,15 @@ class Converters {
 
 @Dao
 interface RitmoDao {
+    @Query("SELECT * FROM account WHERE id = 0")
+    fun observeAccount(): Flow<Account?>
+
+    @Query("SELECT * FROM account WHERE id = 0")
+    suspend fun account(): Account?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveAccount(account: Account)
+
     @Query("SELECT * FROM objectives ORDER BY id")
     fun observeObjectives(): Flow<List<Objective>>
 
@@ -288,6 +311,17 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+/** Versão 5: surge a conta. Quem já usa o app a cria ao abrir, e o progresso fica vinculado a ela. */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `account` (" +
+                "`id` INTEGER NOT NULL, `name` TEXT NOT NULL, `email` TEXT NOT NULL, " +
+                "`password` TEXT, `signedIn` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        )
+    }
+}
+
 @Database(
     entities = [
         Objective::class,
@@ -297,8 +331,9 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         Settings::class,
         Checklist::class,
         ChecklistItem::class,
+        Account::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -308,7 +343,7 @@ abstract class RitmoDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): RitmoDatabase =
             Room.databaseBuilder(context, RitmoDatabase::class.java, "ritmo.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
     }
 }

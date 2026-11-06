@@ -52,7 +52,7 @@ class MigrationTest {
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.databaseBuilder(context, RitmoDatabase::class.java, name)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
         try {
@@ -80,7 +80,7 @@ class MigrationTest {
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.databaseBuilder(context, RitmoDatabase::class.java, name)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
         try {
@@ -94,6 +94,40 @@ class MigrationTest {
             assertEquals(77, state.coins)
             assertEquals(120, state.xp)
             assertEquals(2, state.freezes)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun theProgressStaysAndTheAccountIsCreatedLater() {
+        helper.createDatabase(name, 4).apply {
+            execSQL(
+                "INSERT INTO settings (id, lastClosedDay, themeId, petId, themeMode, remindersEnabled, " +
+                    "streakAlertEnabled, streakAlertMinutes, hapticsEnabled, weekStartsMonday, isPro) " +
+                    "VALUES (0, 20761, 'theme_gold', 'pet_luz', 'DARK', 1, 1, 1140, 1, 0, 1)",
+            )
+            execSQL("INSERT INTO ledger (`key`, xp, coins, freezes, day) VALUES ('earned', 120, 77, 2, 20700)")
+            execSQL("INSERT INTO unlocked_achievements (id, day) VALUES ('first_step', 20761)")
+            close()
+        }
+        helper.runMigrationsAndValidate(name, 5, true, MIGRATION_4_5).close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.databaseBuilder(context, RitmoDatabase::class.java, name)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val state = runBlocking { RitmoRepository(database).load() }!!
+            assertNull(state.account)
+            assertEquals(false, state.signedOut)
+            assertEquals(true, state.settings.isPro)
+            assertEquals("theme_gold", state.settings.themeId)
+            assertEquals("pet_luz", state.settings.petId)
+            assertEquals(77, state.coins)
+            assertEquals(120, state.xp)
+            assertEquals(listOf("first_step"), state.unlocked.map { it.id })
         } finally {
             database.close()
         }
@@ -119,7 +153,7 @@ class MigrationTest {
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.databaseBuilder(context, RitmoDatabase::class.java, name)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
         try {

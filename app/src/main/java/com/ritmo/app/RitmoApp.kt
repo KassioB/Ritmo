@@ -1,6 +1,7 @@
 package com.ritmo.app
 
 import android.app.Application
+import com.ritmo.app.data.AccountRepository
 import com.ritmo.app.data.RitmoDatabase
 import com.ritmo.app.data.RitmoRepository
 import com.ritmo.app.notifications.PetIcon
@@ -16,7 +17,9 @@ class RitmoApp : Application() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var iconSync: Job? = null
 
-    val repository by lazy { RitmoRepository(RitmoDatabase.create(this)) }
+    private val database by lazy { RitmoDatabase.create(this) }
+    val repository by lazy { RitmoRepository(database) }
+    val accounts by lazy { AccountRepository(database) }
 
     override fun onCreate() {
         super.onCreate()

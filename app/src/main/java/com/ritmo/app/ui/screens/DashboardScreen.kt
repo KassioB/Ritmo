@@ -1,5 +1,6 @@
 package com.ritmo.app.ui.screens
 
+import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.automirrored.rounded.TrendingDown
 import androidx.compose.material.icons.automirrored.rounded.TrendingFlat
 import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Lock
@@ -41,6 +44,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -82,6 +86,7 @@ import com.ritmo.app.ui.components.EmptyMessage
 import com.ritmo.app.ui.components.GroupCard
 import com.ritmo.app.ui.components.PtBr
 import com.ritmo.app.ui.theme.Ritmo
+import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -92,8 +97,6 @@ private val weekdayDay = DateTimeFormatter.ofPattern("EEE, d 'de' MMM", PtBr)
 private val monthYear = DateTimeFormatter.ofPattern("MMMM 'de' yyyy", PtBr)
 private val monthOnly = DateTimeFormatter.ofPattern("MMMM", PtBr)
 private val monthLetters = listOf("J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D")
-private val sundayLetters = listOf("D", "S", "T", "Q", "Q", "S", "S")
-private val mondayLetters = listOf("S", "T", "Q", "Q", "S", "S", "D")
 
 private const val FAILED_DAYS_PREVIEW = 5
 private const val MONTH_LABEL_EVERY = 7
@@ -130,8 +133,9 @@ private fun tarefas(count: Int) = if (count == 1) "1 tarefa" else "$count tarefa
 private fun percent(rate: Float) = "${(rate * 100).roundToInt()}%"
 
 @Composable
-fun DashboardScreen(state: UiState, onOpenPro: (String) -> Unit) {
+fun DashboardScreen(state: UiState, onOpenPro: (String) -> Unit, onExport: (Uri) -> Unit) {
     val plan = state.plan
+    val download = rememberHistoryDownload(onExport)
     var chosenRange by rememberSaveable { mutableStateOf(Range.WEEK) }
     // Quem sai do Pro com o mês aberto volta para a semana em vez de ficar numa visão bloqueada.
     val range = chosenRange.takeIf { it in plan.ranges } ?: Range.WEEK
@@ -149,8 +153,12 @@ fun DashboardScreen(state: UiState, onOpenPro: (String) -> Unit) {
         )
     }
 
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
     LazyColumn(
         Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -180,7 +188,23 @@ fun DashboardScreen(state: UiState, onOpenPro: (String) -> Unit) {
                 }
             }
         } else {
+            // Logo abaixo do filtro: assim a grade e o resumo do dia tocado cabem juntos na tela.
+            item(key = "calendario") {
+                StreakCalendar(state, report, weekStart) { month ->
+                    chosenRange = Range.MONTH
+                    anchor = month.atDay(1).toEpochDay()
+                    scope.launch { listState.scrollToItem(0) }
+                }
+            }
             item(key = "resumo") { Headline(report) }
+            item(key = "planilha") {
+                ActionCard(
+                    Icons.Rounded.Download,
+                    "Planilha do histórico",
+                    if (plan.isPro) "Todos os seus dias e objetivos em CSV." else "Baixe seu histórico em CSV com o Pro.",
+                    if (plan.isPro) "Baixar" else "Ver",
+                ) { if (plan.isPro) download() else onOpenPro(ProReason.EXPORT) }
+            }
             item(key = "numeros") { KpiGrid(report) }
             item(key = "grafico") { ChartCard(report, weekStart) }
             if (plan.isPro) {
@@ -188,7 +212,7 @@ fun DashboardScreen(state: UiState, onOpenPro: (String) -> Unit) {
                 item(key = "detalhes") { DetailsCard(report) }
             } else {
                 item(key = "pro") {
-                    ProPromo("Entenda seu ritmo", "Mês e ano, dicas e análises por dia, turno e dificuldade.") {
+                    ProPromo("Veja o mês e o ano", "Calendário completo, dicas e análises por dia, turno e dificuldade.") {
                         onOpenPro(ProReason.NONE)
                     }
                 }
@@ -444,7 +468,7 @@ private fun ActivityChart(
     val axisStyle = MaterialTheme.typography.labelSmall.copy(color = scheme.onSurfaceVariant)
     val buckets = report.buckets
     val axisTop = niceTop(buckets.maxOf { it.total })
-    val letters = if (weekStart == DayOfWeek.MONDAY) mondayLetters else sundayLetters
+    val letters = weekLetters(weekStart)
     val summary = "Gráfico de colunas: ${report.done} concluídas e ${report.notDone} não concluídas no período. " +
         "Os valores de cada coluna estão em Ver tabela."
 
@@ -626,7 +650,7 @@ private fun PeakCard(report: Report) {
 }
 
 @Composable
-private fun InsightLine(icon: ImageVector, tint: Color, title: String, detail: String?) {
+internal fun InsightLine(icon: ImageVector, tint: Color, title: String, detail: String?) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
         Spacer(Modifier.width(10.dp))
