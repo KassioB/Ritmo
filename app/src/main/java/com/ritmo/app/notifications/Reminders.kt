@@ -15,7 +15,7 @@ import androidx.core.content.edit
 import com.ritmo.app.MainActivity
 import com.ritmo.app.R
 import com.ritmo.app.RitmoApp
-import com.ritmo.app.data.Objective
+import com.ritmo.app.data.Snapshot
 import com.ritmo.app.domain.ReminderPlan
 import com.ritmo.app.domain.Streaks
 import com.ritmo.app.domain.dias
@@ -53,7 +53,7 @@ object Reminders {
      * pelo sistema continue pendente. [edited] recomeça de agora: um lembrete recém-criado para
      * um horário que já passou não deve tocar.
      */
-    fun sync(context: Context, objectives: List<Objective>, edited: Boolean = false) {
+    fun sync(context: Context, state: Snapshot, edited: Boolean = false) {
         val now = LocalDateTime.now()
         val last = lastCheck(context)
         val after = if (edited || last == null || last.isAfter(now)) {
@@ -62,7 +62,22 @@ object Reminders {
         } else {
             last
         }
-        setAlarm(context, ReminderPlan.next(after, objectives))
+        schedule(context, state, after)
+    }
+
+    private fun activeObjectives(state: Snapshot) =
+        if (state.settings.remindersEnabled) state.objectives else emptyList()
+
+    private fun alertMinutes(state: Snapshot) =
+        state.settings.streakAlertMinutes.takeIf { state.settings.streakAlertEnabled }
+
+    private fun schedule(context: Context, state: Snapshot, after: LocalDateTime) {
+        val next = ReminderPlan.next(after, activeObjectives(state), alertMinutes(state))
+        if (next != null) {
+            setAlarm(context, next)
+        } else {
+            context.getSystemService(AlarmManager::class.java).cancel(pendingIntent(context))
+        }
     }
 
     private fun setAlarm(context: Context, at: LocalDateTime) {
@@ -104,7 +119,7 @@ object Reminders {
         val oldest = now.minusHours(MAX_LATE_HOURS)
         val from = (lastCheck(context) ?: now).let { if (it.isBefore(oldest)) oldest else it }
 
-        ReminderPlan.between(from, now, state.objectives)
+        ReminderPlan.between(from, now, activeObjectives(state))
             .filterNot { state.isDone(it.objective.id, it.at.toLocalDate().toEpochDay()) }
             // Vários horários vencidos juntos viram um só aviso por objetivo.
             .distinctBy { it.objective.id }
@@ -119,7 +134,8 @@ object Reminders {
                 notify(context, objective.id, "${objective.emoji} ${objective.title}", detail)
             }
 
-        if (ReminderPlan.eveningBetween(from, now)) {
+        val alert = alertMinutes(state)
+        if (alert != null && ReminderPlan.alertBetween(from, now, alert)) {
             val today = LocalDate.now().toEpochDay()
             val streak = state.mainStreak(today).current
             if (state.scheduledOn(today).isNotEmpty() && !state.isComplete(today) && streak > 0) {
@@ -127,12 +143,13 @@ object Reminders {
                     context,
                     EVENING_ID,
                     "Seu streak de ${dias(streak)} está em risco!",
-                    "A Faísca está preocupada. Ainda dá tempo de completar o dia.",
+                    "Ainda dá tempo de completar o dia.",
                 )
             }
         }
         setLastCheck(context, now)
-        setAlarm(context, ReminderPlan.next(now, state.objectives))
+        schedule(context, state, now)
+        PetIcon.sync(context, state)
     }
 
     @SuppressLint("MissingPermission")
@@ -178,7 +195,10 @@ class BootReceiver : BroadcastReceiver() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val state = (context.applicationContext as RitmoApp).repository.load()
-                if (state != null) Reminders.sync(context, state.objectives)
+                if (state != null) {
+                    Reminders.sync(context, state)
+                    PetIcon.sync(context, state)
+                }
             } finally {
                 pending.finish()
             }

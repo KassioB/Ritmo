@@ -3,6 +3,7 @@ package com.ritmo.app.domain
 import com.ritmo.app.data.Objective
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -11,6 +12,8 @@ import java.time.LocalDateTime
 class ReminderPlanTest {
     /** Quinta-feira. */
     private val day = LocalDate.of(2026, 11, 5)
+    private val alert = ReminderPlan.DEFAULT_ALERT_MINUTES
+
     private fun at(hour: Int, minute: Int = 0, plusDays: Long = 0): LocalDateTime =
         day.plusDays(plusDays).atTime(hour, minute)
 
@@ -34,26 +37,26 @@ class ReminderPlanTest {
 
     @Test fun everyReminderOfTheDayIsPlannedInOrder() {
         val water = objective(8 * 60, 12 * 60 + 15, 18 * 60)
-        assertEquals(at(8), ReminderPlan.next(at(0), listOf(water)))
-        assertEquals(at(12, 15), ReminderPlan.next(at(8), listOf(water)))
-        assertEquals(at(18), ReminderPlan.next(at(12, 15), listOf(water)))
+        assertEquals(at(8), ReminderPlan.next(at(0), listOf(water), alert))
+        assertEquals(at(12, 15), ReminderPlan.next(at(8), listOf(water), alert))
+        assertEquals(at(18), ReminderPlan.next(at(12, 15), listOf(water), alert))
     }
 
     @Test fun theEveningCheckComesBeforeTomorrowsReminder() {
         val water = objective(8 * 60)
-        assertEquals(at(20), ReminderPlan.next(at(9), listOf(water)))
-        assertEquals(at(8, plusDays = 1), ReminderPlan.next(at(20), listOf(water)))
+        assertEquals(at(20), ReminderPlan.next(at(9), listOf(water), alert))
+        assertEquals(at(8, plusDays = 1), ReminderPlan.next(at(20), listOf(water), alert))
     }
 
     @Test fun skipsDaysTheObjectiveIsNotScheduled() {
         val fridayOnly = objective(9 * 60, daysMask = 1 shl 4)
-        assertEquals(at(20), ReminderPlan.next(at(10), listOf(fridayOnly)))
-        assertEquals(at(9, plusDays = 1), ReminderPlan.next(at(20), listOf(fridayOnly)))
+        assertEquals(at(20), ReminderPlan.next(at(10), listOf(fridayOnly), alert))
+        assertEquals(at(9, plusDays = 1), ReminderPlan.next(at(20), listOf(fridayOnly), alert))
     }
 
     @Test fun archivedObjectivesNeverRing() {
         val archived = objective(9 * 60, archivedDay = day.toEpochDay())
-        assertEquals(at(20), ReminderPlan.next(at(8), listOf(archived)))
+        assertEquals(at(20), ReminderPlan.next(at(8), listOf(archived), alert))
         assertEquals(emptyList<DueReminder>(), ReminderPlan.between(at(8), at(10), listOf(archived)))
     }
 
@@ -76,18 +79,32 @@ class ReminderPlanTest {
     }
 
     @Test fun noObjectivesStillSchedulesTheEveningCheck() {
-        assertEquals(at(20), ReminderPlan.next(at(12), emptyList()))
+        assertEquals(at(20), ReminderPlan.next(at(12), emptyList(), alert))
     }
 
     @Test fun eveningIsDetectedOnlyInsideTheInterval() {
-        assertTrue(ReminderPlan.eveningBetween(at(19), at(20)))
-        assertFalse(ReminderPlan.eveningBetween(at(20), at(21)))
-        assertFalse(ReminderPlan.eveningBetween(at(10), at(19, 59)))
+        assertTrue(ReminderPlan.alertBetween(at(19), at(20), alert))
+        assertFalse(ReminderPlan.alertBetween(at(20), at(21), alert))
+        assertFalse(ReminderPlan.alertBetween(at(10), at(19, 59), alert))
+    }
+
+    @Test fun theStreakAlertFollowsTheChosenTime() {
+        assertEquals(at(21, 30), ReminderPlan.next(at(12), emptyList(), 21 * 60 + 30))
+        assertTrue(ReminderPlan.alertBetween(at(21), at(22), 21 * 60 + 30))
+    }
+
+    @Test fun withTheAlertOffOnlyRemindersCount() {
+        val water = objective(8 * 60)
+        assertEquals(at(8, plusDays = 1), ReminderPlan.next(at(9), listOf(water), null))
+    }
+
+    @Test fun withEverythingOffNothingIsScheduled() {
+        assertNull(ReminderPlan.next(at(9), emptyList(), null))
     }
 
     @Test fun hundredsOfRemindersAreHandled() {
         val many = objective(*(0 until 1440 step 2).toList().toIntArray())
-        assertEquals(at(12, 2), ReminderPlan.next(at(12), listOf(many)))
+        assertEquals(at(12, 2), ReminderPlan.next(at(12), listOf(many), alert))
         assertEquals(30, ReminderPlan.between(at(12), at(13), listOf(many)).size)
     }
 

@@ -1,0 +1,550 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gerado por tools/generate_pet_icons.py. Não edite à mão. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name="com.ritmo.app.LauncherActivity"
+            android:exported="false"
+            android:relinquishTaskIdentity="true" />
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca0Happy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca0happy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca0Excited"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca0excited"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca0Worried"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca0worried"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca0Sad"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca0sad"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca0Sleepy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca0sleepy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca1Happy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca1happy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca1Excited"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca1excited"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca1Worried"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca1worried"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca1Sad"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca1sad"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca1Sleepy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca1sleepy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca2Happy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca2happy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca2Excited"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca2excited"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca2Worried"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca2worried"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca2Sad"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca2sad"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca2Sleepy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca2sleepy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca3Happy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca3happy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca3Excited"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca3excited"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca3Worried"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca3worried"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca3Sad"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca3sad"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca3Sleepy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca3sleepy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca4Happy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca4happy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca4Excited"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca4excited"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca4Worried"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca4worried"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca4Sad"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca4sad"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca4Sleepy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca4sleepy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca5Happy"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca5happy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca5Excited"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca5excited"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca5Worried"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca5worried"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca5Sad"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca5sad"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.Faisca5Sleepy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_faisca5sleepy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.RaioHappy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_raiohappy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.RaioExcited"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_raioexcited"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.RaioWorried"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_raioworried"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.RaioSad"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_raiosad"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.RaioSleepy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_raiosleepy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.LuzHappy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_luzhappy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.LuzExcited"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_luzexcited"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.LuzWorried"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_luzworried"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.LuzSad"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_luzsad"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.LuzSleepy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_luzsleepy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.MarombaHappy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_marombahappy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.MarombaExcited"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_marombaexcited"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.MarombaWorried"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_marombaworried"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.MarombaSad"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_marombasad"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name="com.ritmo.app.icon.MarombaSleepy"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_pet_marombasleepy"
+            android:label="Ritmo"
+            android:targetActivity="com.ritmo.app.LauncherActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+    </application>
+</manifest>

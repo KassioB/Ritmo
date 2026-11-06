@@ -19,13 +19,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ritmo.app.domain.Mood
 import com.ritmo.app.ui.ListRow
 import com.ritmo.app.ui.UiState
 import com.ritmo.app.ui.components.ChunkyProgress
 import com.ritmo.app.ui.components.EmptyMessage
 import com.ritmo.app.ui.components.GroupCard
 import com.ritmo.app.ui.components.IconBadge
-import com.ritmo.app.ui.components.Mood
 import com.ritmo.app.ui.components.SectionBanner
 import com.ritmo.app.ui.theme.ObjectiveColors
 
@@ -35,7 +35,8 @@ fun ListsScreen(state: UiState, onOpen: (Long) -> Unit, onCreate: () -> Unit) {
         EmptyMessage(
             "Nenhuma lista ainda",
             "Monte listas de compras, exercícios ou estudos. Cada item concluído rende XP, igual à rotina.",
-            state.accessoryId,
+            state.petId,
+            state.stage.index,
             Mood.HAPPY,
             action = "Criar lista",
             onAction = onCreate,

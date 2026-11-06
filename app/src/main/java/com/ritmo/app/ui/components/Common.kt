@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.ritmo.app.domain.Mood
 import com.ritmo.app.ui.theme.Mint
 import com.ritmo.app.ui.theme.ObjectiveColors
 import com.ritmo.app.ui.theme.Ritmo
@@ -43,7 +44,7 @@ data class Celebration(
 )
 
 @Composable
-fun CelebrationDialog(celebration: Celebration, accessory: String?, onDismiss: () -> Unit) {
+fun CelebrationDialog(celebration: Celebration, pet: String?, stage: Int, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Box(contentAlignment = Alignment.Center) {
             Card(
@@ -54,7 +55,7 @@ fun CelebrationDialog(celebration: Celebration, accessory: String?, onDismiss: (
                     Modifier.fillMaxWidth().padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Faisca(celebration.mood, accessory, sizeDp = 130.dp)
+                    Mascot(pet, stage, celebration.mood, sizeDp = 130.dp)
                     Spacer(Modifier.height(12.dp))
                     Text(
                         celebration.title,
@@ -127,7 +128,8 @@ fun RewardPill(text: String, modifier: Modifier = Modifier) {
 fun EmptyMessage(
     title: String,
     message: String,
-    accessory: String?,
+    pet: String?,
+    stage: Int,
     mood: Mood = Mood.SLEEPY,
     action: String? = null,
     onAction: () -> Unit = {},
@@ -137,7 +139,7 @@ fun EmptyMessage(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Faisca(mood, accessory, sizeDp = 170.dp)
+        Mascot(pet, stage, mood, sizeDp = 170.dp)
         Spacer(Modifier.height(18.dp))
         Text(title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
         Spacer(Modifier.height(6.dp))

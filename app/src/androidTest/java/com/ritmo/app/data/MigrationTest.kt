@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.testing.MigrationTestHelper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.ritmo.app.domain.ReminderPlan
+import com.ritmo.app.domain.ThemeMode
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -38,6 +40,32 @@ class MigrationTest {
         }
 
     @Test
+    fun boughtAccessoriesAreRefundedWhenTheyLeaveTheShop() {
+        helper.createDatabase(name, 2).apply {
+            execSQL("INSERT INTO settings (id, lastClosedDay, themeId, accessoryId) VALUES (0, 20761, 'theme_ocean', 'acc_crown')")
+            execSQL("INSERT INTO ledger (`key`, xp, coins, freezes, day) VALUES ('earned', 0, 500, 0, 20700)")
+            execSQL("INSERT INTO ledger (`key`, xp, coins, freezes, day) VALUES ('purchase:acc_crown', 0, -300, 0, 20750)")
+            execSQL("INSERT INTO ledger (`key`, xp, coins, freezes, day) VALUES ('purchase:theme_ocean', 0, -100, 0, 20751)")
+            close()
+        }
+        helper.runMigrationsAndValidate(name, 3, true, MIGRATION_2_3).close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.databaseBuilder(context, RitmoDatabase::class.java, name)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val state = runBlocking { RitmoRepository(database).load() }!!
+            assertEquals(400, state.coins)
+            assertEquals("theme_ocean", state.settings.themeId)
+            assertNull(state.settings.petId)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
     fun keepsEverythingFromVersionOne() {
         helper.createDatabase(name, 1).apply {
             insert("objectives", SQLiteDatabase.CONFLICT_ABORT, objective(1, "agua", 735))
@@ -53,10 +81,11 @@ class MigrationTest {
 
         // Valida o esquema final contra o que o Room espera e executa a migração real.
         helper.runMigrationsAndValidate(name, 2, true, MIGRATION_1_2).close()
+        helper.runMigrationsAndValidate(name, 3, true, MIGRATION_2_3).close()
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.databaseBuilder(context, RitmoDatabase::class.java, name)
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .allowMainThreadQueries()
             .build()
         try {
@@ -80,7 +109,11 @@ class MigrationTest {
             assertEquals(3, state.coins)
             assertEquals(1, state.freezes)
             assertEquals(listOf("first_step"), state.unlocked.map { it.id })
-            assertEquals("acc_crown", state.settings.accessoryId)
+            assertEquals(20761L, state.settings.lastClosedDay)
+            assertNull(state.settings.petId)
+            assertEquals(ThemeMode.SYSTEM, state.settings.themeMode)
+            assertEquals(true, state.settings.remindersEnabled)
+            assertEquals(ReminderPlan.DEFAULT_ALERT_MINUTES, state.settings.streakAlertMinutes)
             assertEquals(emptyList<Checklist>(), state.lists)
 
             // Um objetivo novo não pode reaproveitar o id de um antigo.

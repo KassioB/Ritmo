@@ -21,8 +21,8 @@ fun List<Int>.withReminder(minutes: Int, replacing: Int? = null): List<Int> =
  * deixa alarme órfão e um disparo atrasado pelo sistema não perde nenhum horário.
  */
 object ReminderPlan {
-    /** Horário do aviso de streak em risco. */
-    const val EVENING_MINUTES = 20 * 60
+    /** Horário padrão do aviso de streak em risco. */
+    const val DEFAULT_ALERT_MINUTES = 20 * 60
     private const val DAYS_AHEAD = 7L
 
     private fun LocalDate.at(minutes: Int) = atTime(minutes / 60, minutes % 60)
@@ -39,13 +39,15 @@ object ReminderPlan {
         }.filter { it.at.isAfter(from) && !it.at.isAfter(to) }.sortedBy { it.at }
     }
 
-    fun eveningBetween(from: LocalDateTime, to: LocalDateTime): Boolean {
-        val next = nextEvening(from)
-        return !next.isAfter(to)
-    }
+    /** Se o aviso de streak às [alertMinutes] caiu dentro do intervalo (from, to]. */
+    fun alertBetween(from: LocalDateTime, to: LocalDateTime, alertMinutes: Int): Boolean =
+        !nextAlert(from, alertMinutes).isAfter(to)
 
-    /** O primeiro momento depois de [after] em que algo precisa ser verificado. */
-    fun next(after: LocalDateTime, objectives: List<Objective>): LocalDateTime {
+    /**
+     * O primeiro momento depois de [after] em que algo precisa ser verificado, ou nulo se
+     * não há lembretes e o aviso de streak ([alertMinutes]) está desligado.
+     */
+    fun next(after: LocalDateTime, objectives: List<Objective>, alertMinutes: Int?): LocalDateTime? {
         val reminder = (0..DAYS_AHEAD)
             .map { after.toLocalDate().plusDays(it) }
             .flatMap { date ->
@@ -54,12 +56,12 @@ object ReminderPlan {
             }
             .filter { it.isAfter(after) }
             .minOrNull()
-        val evening = nextEvening(after)
-        return if (reminder != null && reminder.isBefore(evening)) reminder else evening
+        val alert = alertMinutes?.let { nextAlert(after, it) }
+        return listOfNotNull(reminder, alert).minOrNull()
     }
 
-    private fun nextEvening(after: LocalDateTime): LocalDateTime {
-        val today = after.toLocalDate().at(EVENING_MINUTES)
+    private fun nextAlert(after: LocalDateTime, minutes: Int): LocalDateTime {
+        val today = after.toLocalDate().at(minutes)
         return if (today.isAfter(after)) today else today.plusDays(1)
     }
 }

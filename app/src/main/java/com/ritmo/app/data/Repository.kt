@@ -7,6 +7,10 @@ import com.ritmo.app.domain.DayCloser
 import com.ritmo.app.domain.DayRecord
 import com.ritmo.app.domain.DayStatus
 import com.ritmo.app.domain.Difficulty
+import com.ritmo.app.domain.Evolution
+import com.ritmo.app.domain.EvolutionStage
+import com.ritmo.app.domain.PetFeeling
+import com.ritmo.app.domain.PetMood
 import com.ritmo.app.domain.Progression
 import com.ritmo.app.domain.ShopItem
 import com.ritmo.app.domain.ShopKind
@@ -44,6 +48,34 @@ data class Snapshot(
 
     fun mainStreak(today: Long): Streak = Streaks.main(records, today, isComplete(today))
 
+    fun streakRepair(today: Long) = Streaks.repairable(records, today, isComplete(today))
+
+    /** Como o pet está em [hour]; vale para a mascote e para o ícone do app. */
+    fun feeling(today: Long, hour: Int): PetFeeling {
+        val scheduled = scheduledOn(today)
+        return PetMood.of(
+            scheduled = scheduled.size,
+            done = scheduled.count { isDone(it.id, today) },
+            complete = isComplete(today),
+            main = mainStreak(today),
+            hasHistory = records.isNotEmpty(),
+            canRepair = streakRepair(today) != null,
+            hour = hour,
+        )
+    }
+
+    /**
+     * Como o estado fica com os dias passados fechados, sem gravar nada. Quem fecha de verdade é
+     * o app aberto, porque só ele consegue avisar que um bloqueio foi usado.
+     */
+    fun closedUntil(today: Long): Snapshot {
+        val from = settings.lastClosedDay + 1
+        val to = today - 1
+        if (from > to) return this
+        val closing = DayCloser.close(from, to, { day -> scheduledOn(day).map { it.id } }, records, freezes)
+        return copy(records = records + closing.newRecords)
+    }
+
     fun stats(today: Long) = Stats(
         completions = records.count { it.status == DayStatus.DONE } + ledger.count { it.key.startsWith(ITEM) },
         perfectDays = ledger.count { it.key.startsWith(PERFECT) },
@@ -51,7 +83,7 @@ data class Snapshot(
         bestObjectiveStreak = objectives.maxOfOrNull { Streaks.forObjective(it.id, records).best } ?: 0,
         level = Progression.levelFor(xp).level,
         freezesUsed = ledger.count { it.key.startsWith(FREEZE_USED) },
-        purchases = ledger.count { it.key.startsWith(PURCHASE) || it.key.startsWith(FREEZE_BOUGHT) },
+        purchases = ledger.count { entry -> PAID.any { entry.key.startsWith(it) } },
     )
 
     companion object {
@@ -61,6 +93,8 @@ data class Snapshot(
         const val FREEZE_USED = "freeze-used:"
         const val ITEM = "item:"
         const val LIST_DONE = "list-done:"
+        const val STREAK_REPAIR = "streak-repair:"
+        private val PAID = listOf(PURCHASE, FREEZE_BOUGHT, STREAK_REPAIR)
     }
 }
 
@@ -71,6 +105,8 @@ data class ToggleOutcome(
     /** Título da lista que acabou de ser concluída por este toque. */
     val finishedList: String? = null,
     val newLevel: Int? = null,
+    /** A nova fase, quando este toque fez a mascote evoluir. */
+    val evolvedTo: EvolutionStage? = null,
     val achievements: List<Achievement> = emptyList(),
 )
 
@@ -221,28 +257,46 @@ class RitmoRepository(private val db: RitmoDatabase) {
     suspend fun buy(item: ShopItem, today: Long): List<Achievement>? = db.withTransaction {
         val state = load() ?: return@withTransaction null
         if (state.coins < item.price) return@withTransaction null
-        if (item.kind == ShopKind.FREEZE) {
-            if (state.freezes >= Progression.MAX_FREEZES) return@withTransaction null
-            val serial = state.ledger.count { it.key.startsWith(Snapshot.FREEZE_BOUGHT) }
-            dao.addLedger(
-                LedgerEntry("${Snapshot.FREEZE_BOUGHT}$serial", coins = -item.price, freezes = 1, day = today),
-            )
-        } else {
-            if (item.id in state.owned) return@withTransaction null
-            dao.addLedger(LedgerEntry("${Snapshot.PURCHASE}${item.id}", coins = -item.price, day = today))
-            equip(item, state.settings)
+        when (item.kind) {
+            ShopKind.FREEZE -> {
+                if (state.freezes >= Progression.MAX_FREEZES) return@withTransaction null
+                val serial = state.ledger.count { it.key.startsWith(Snapshot.FREEZE_BOUGHT) }
+                dao.addLedger(
+                    LedgerEntry("${Snapshot.FREEZE_BOUGHT}$serial", coins = -item.price, freezes = 1, day = today),
+                )
+            }
+            ShopKind.REPAIR -> {
+                val repair = state.streakRepair(today) ?: return@withTransaction null
+                dao.saveRecords(
+                    state.records.filter { it.day in repair.days && it.status == DayStatus.MISSED }
+                        .map { DayRecordRow(it.objectiveId, it.day, DayStatus.FROZEN) },
+                )
+                dao.addLedger(
+                    LedgerEntry("${Snapshot.STREAK_REPAIR}${repair.days.first()}", coins = -item.price, day = today),
+                )
+            }
+            ShopKind.THEME, ShopKind.PET -> {
+                if (item.id in state.owned) return@withTransaction null
+                dao.addLedger(LedgerEntry("${Snapshot.PURCHASE}${item.id}", coins = -item.price, day = today))
+                equip(item, state.settings)
+            }
         }
         unlockAchievements(today)
     }
 
+    suspend fun updateSettings(change: (Settings) -> Settings) {
+        val settings = dao.settings() ?: return
+        dao.saveSettings(change(settings))
+    }
+
     suspend fun toggleEquipped(item: ShopItem) {
         val settings = dao.settings() ?: return
-        val equipped = item.id == settings.themeId || item.id == settings.accessoryId
+        val equipped = item.id == settings.themeId || item.id == settings.petId
         if (equipped) {
             dao.saveSettings(
                 when (item.kind) {
                     ShopKind.THEME -> settings.copy(themeId = null)
-                    else -> settings.copy(accessoryId = null)
+                    else -> settings.copy(petId = null)
                 },
             )
         } else {
@@ -253,8 +307,8 @@ class RitmoRepository(private val db: RitmoDatabase) {
     private suspend fun equip(item: ShopItem, settings: Settings) {
         when (item.kind) {
             ShopKind.THEME -> dao.saveSettings(settings.copy(themeId = item.id))
-            ShopKind.ACCESSORY -> dao.saveSettings(settings.copy(accessoryId = item.id))
-            ShopKind.FREEZE -> Unit
+            ShopKind.PET -> dao.saveSettings(settings.copy(petId = item.id))
+            ShopKind.FREEZE, ShopKind.REPAIR -> Unit
         }
     }
 
@@ -267,12 +321,15 @@ class RitmoRepository(private val db: RitmoDatabase) {
         val after = load() ?: before
         val oldLevel = Progression.levelFor(before.xp).level
         val newLevel = Progression.levelFor(after.xp).level
+        val oldStage = Evolution.stageFor(before.mainStreak(today).current)
+        val newStage = Evolution.stageFor(after.mainStreak(today).current)
         return ToggleOutcome(
             xp = after.xp - before.xp,
             coins = after.coins - before.coins,
             perfectDay = !before.isComplete(today) && after.isComplete(today),
             finishedList = finishedList,
             newLevel = newLevel.takeIf { it > oldLevel },
+            evolvedTo = newStage.takeIf { it.index > oldStage.index },
             achievements = achievements,
         )
     }

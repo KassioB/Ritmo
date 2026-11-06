@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
 import com.ritmo.app.R
+import com.ritmo.app.domain.ThemeMode
 
 // Paleta da marca.
 val Indigo = Color(0xFF211951)
@@ -48,6 +49,9 @@ private val Sky = Color(0xFF7CC8FF)
 private val Coral = Color(0xFFFF6B8A)
 private val DeepCoral = Color(0xFFD93A63)
 private val Ink = Color(0xFF111114)
+private val ChartPurple = Color(0xFF8E7DFF)
+private val ChartCoral = Color(0xFFE0446C)
+private val ChartCoralDark = Color(0xFFEE4F78)
 
 /** Cores dos objetivos e das listas; o índice fica salvo, então novas cores entram no fim. */
 val ObjectiveColors = listOf(
@@ -82,6 +86,9 @@ data class BrandColors(
     val onDone: Color,
     val doneText: Color,
     val missed: Color,
+    /** Par validado para daltonismo em cada tema: não usa verde e vermelho juntos. */
+    val chartDone: Color,
+    val chartMissed: Color,
 )
 
 private data class Look(val scheme: ColorScheme, val brand: BrandColors)
@@ -167,6 +174,8 @@ private val RitmoLight = Look(
         onDone = Indigo,
         doneText = InkMint,
         missed = DeepCoral,
+        chartDone = DeepPurple,
+        chartMissed = ChartCoral,
     ),
 )
 
@@ -184,7 +193,13 @@ private val RitmoDark = Look(
         accentTint = Color(0xFF3A2F8F),
         error = Coral,
     ),
-    RitmoLight.brand.copy(header = DeepIndigo, doneText = Mint, missed = Coral),
+    RitmoLight.brand.copy(
+        header = DeepIndigo,
+        doneText = Mint,
+        missed = Coral,
+        chartDone = ChartPurple,
+        chartMissed = ChartCoralDark,
+    ),
 )
 
 private val BlueLight = Look(
@@ -220,6 +235,8 @@ private val BlueLight = Look(
         onDone = Color.White,
         doneText = DeepBlue,
         missed = DeepCoral,
+        chartDone = Color(0xFF1F6FEB),
+        chartMissed = ChartCoral,
     ),
 )
 
@@ -237,7 +254,13 @@ private val BlueDark = Look(
         accentTint = Color(0xFF17345F),
         error = Coral,
     ),
-    BlueLight.brand.copy(header = Color(0xFF06142B), doneText = Color(0xFF7DB0FF), missed = Coral),
+    BlueLight.brand.copy(
+        header = Color(0xFF06142B),
+        doneText = Color(0xFF7DB0FF),
+        missed = Coral,
+        chartDone = Color(0xFF448CFF),
+        chartMissed = ChartCoralDark,
+    ),
 )
 
 private val White = Look(
@@ -273,6 +296,8 @@ private val White = Look(
         onDone = Color.White,
         doneText = Ink,
         missed = DeepCoral,
+        chartDone = DeepPurple,
+        chartMissed = ChartCoral,
     ),
 )
 
@@ -297,18 +322,21 @@ private val Black = Look(
         onDone = Color.Black,
         doneText = Mint,
         missed = Coral,
+        chartDone = ChartPurple,
+        chartMissed = ChartCoralDark,
     ),
 )
 
-private fun look(themeId: String?, systemDark: Boolean): Look = when (themeId) {
-    "theme_ocean" -> if (systemDark) BlueDark else BlueLight
+private fun look(themeId: String?, dark: Boolean): Look = when (themeId) {
+    "theme_ocean" -> if (dark) BlueDark else BlueLight
     "theme_white" -> White
     "theme_black" -> Black
-    else -> if (systemDark) RitmoDark else RitmoLight
+    else -> if (dark) RitmoDark else RitmoLight
 }
 
 /** Amostras mostradas na loja para o usuário ver o tema antes de comprar. */
 val ThemeSwatches = mapOf(
+    "theme_default" to listOf(Indigo, Purple, Frost),
     "theme_ocean" to listOf(NightBlue, Blue, Color.White),
     "theme_white" to listOf(Color.White, Purple, Ink),
     "theme_black" to listOf(Color.Black, Mint, Color.White),
@@ -382,8 +410,13 @@ object Ritmo {
 }
 
 @Composable
-fun RitmoTheme(themeId: String?, content: @Composable () -> Unit) {
-    val look = look(themeId, isSystemInDarkTheme())
+fun RitmoTheme(themeId: String?, mode: ThemeMode, content: @Composable () -> Unit) {
+    val dark = when (mode) {
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
+    val look = look(themeId, dark)
     val view = LocalView.current
     SideEffect {
         val window = (view.context as Activity).window

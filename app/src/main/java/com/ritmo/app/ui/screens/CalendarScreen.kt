@@ -51,7 +51,8 @@ import java.time.format.DateTimeFormatter
 
 private val monthFormat = DateTimeFormatter.ofPattern("MMMM 'de' yyyy", PtBr)
 private val dayFormat = DateTimeFormatter.ofPattern("d 'de' MMMM", PtBr)
-private val weekLabels = listOf("D", "S", "T", "Q", "Q", "S", "S")
+private val sundayFirst = listOf("D", "S", "T", "Q", "Q", "S", "S")
+private val mondayFirst = listOf("S", "T", "Q", "Q", "S", "S", "D")
 
 private fun statusColor(brand: BrandColors, status: DayStatus?) = when (status) {
     DayStatus.DONE -> brand.done
@@ -73,6 +74,8 @@ fun CalendarScreen(state: UiState) {
     var selected by remember { mutableStateOf(state.today) }
     val brand = Ritmo.brand
     val perfectDays = state.dayOutcomes.values.count { it == DayStatus.DONE }
+    val weekStartsMonday = state.settings.weekStartsMonday
+    val weekLabels = if (weekStartsMonday) mondayFirst else sundayFirst
 
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -120,7 +123,8 @@ fun CalendarScreen(state: UiState) {
                 }
                 Spacer(Modifier.height(6.dp))
 
-                val leading = month.atDay(1).dayOfWeek.value % 7
+                val weekday = month.atDay(1).dayOfWeek.value
+                val leading = if (weekStartsMonday) weekday - 1 else weekday % 7
                 val cells: List<Int?> = List(leading) { null } + (1..month.lengthOfMonth()).toList()
                 cells.chunked(7).forEach { week ->
                     Row(Modifier.fillMaxWidth()) {

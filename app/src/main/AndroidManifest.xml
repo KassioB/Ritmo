@@ -13,18 +13,18 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Ritmo">
 
+        <!-- A entrada no launcher fica em src/main/pet-icons: um atalho por estado do pet. -->
         <activity
             android:name=".MainActivity"
-            android:exported="true"
-            android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <receiver
             android:name=".notifications.ReminderReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".notifications.PetIconReceiver"
             android:exported="false" />
 
         <receiver

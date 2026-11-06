@@ -19,6 +19,8 @@ import com.ritmo.app.domain.Difficulty
 import com.ritmo.app.domain.DayRecord
 import com.ritmo.app.domain.DayStatus
 import com.ritmo.app.domain.Period
+import com.ritmo.app.domain.ReminderPlan
+import com.ritmo.app.domain.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
@@ -80,7 +82,13 @@ data class Settings(
     @PrimaryKey val id: Int = 0,
     val lastClosedDay: Long,
     val themeId: String? = null,
-    val accessoryId: String? = null,
+    val petId: String? = null,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val remindersEnabled: Boolean = true,
+    val streakAlertEnabled: Boolean = true,
+    val streakAlertMinutes: Int = ReminderPlan.DEFAULT_ALERT_MINUTES,
+    val hapticsEnabled: Boolean = true,
+    val weekStartsMonday: Boolean = false,
 )
 
 /** Lista livre (compras, exercícios, estudos...), independente da rotina diária. */
@@ -243,6 +251,35 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+/**
+ * Versão 3: entram as preferências e os acessórios dão lugar aos pets. `settings` é recriada
+ * para trocar a coluna, e quem tinha comprado um acessório recebe as moedas de volta.
+ */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `settings_new` (" +
+                "`id` INTEGER NOT NULL, `lastClosedDay` INTEGER NOT NULL, `themeId` TEXT, `petId` TEXT, " +
+                "`themeMode` TEXT NOT NULL, `remindersEnabled` INTEGER NOT NULL, " +
+                "`streakAlertEnabled` INTEGER NOT NULL, `streakAlertMinutes` INTEGER NOT NULL, " +
+                "`hapticsEnabled` INTEGER NOT NULL, `weekStartsMonday` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        )
+        db.execSQL(
+            "INSERT INTO `settings_new` (`id`, `lastClosedDay`, `themeId`, `petId`, `themeMode`, " +
+                "`remindersEnabled`, `streakAlertEnabled`, `streakAlertMinutes`, `hapticsEnabled`, " +
+                "`weekStartsMonday`) SELECT `id`, `lastClosedDay`, `themeId`, NULL, 'SYSTEM', 1, 1, " +
+                "${ReminderPlan.DEFAULT_ALERT_MINUTES}, 1, 0 FROM `settings`",
+        )
+        db.execSQL("DROP TABLE `settings`")
+        db.execSQL("ALTER TABLE `settings_new` RENAME TO `settings`")
+        db.execSQL(
+            "INSERT OR IGNORE INTO `ledger` (`key`, `xp`, `coins`, `freezes`, `day`) " +
+                "SELECT 'refund:' || `key`, 0, -`coins`, 0, `day` FROM `ledger` " +
+                "WHERE `key` LIKE 'purchase:acc_%'",
+        )
+    }
+}
+
 @Database(
     entities = [
         Objective::class,
@@ -253,7 +290,7 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         Checklist::class,
         ChecklistItem::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -263,7 +300,7 @@ abstract class RitmoDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): RitmoDatabase =
             Room.databaseBuilder(context, RitmoDatabase::class.java, "ritmo.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }

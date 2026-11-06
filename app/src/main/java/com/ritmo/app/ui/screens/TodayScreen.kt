@@ -29,16 +29,17 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ritmo.app.data.Objective
+import com.ritmo.app.domain.Mood
+import com.ritmo.app.domain.Pets
 import com.ritmo.app.domain.clock
 import com.ritmo.app.ui.ObjectiveRow
 import com.ritmo.app.ui.UiState
 import com.ritmo.app.ui.components.CheckToggle
 import com.ritmo.app.ui.components.ChunkyProgress
 import com.ritmo.app.ui.components.EmptyMessage
-import com.ritmo.app.ui.components.Faisca
+import com.ritmo.app.ui.components.Mascot
 import com.ritmo.app.ui.components.GroupCard
 import com.ritmo.app.ui.components.IconBadge
-import com.ritmo.app.ui.components.Mood
 import com.ritmo.app.ui.components.PtBr
 import com.ritmo.app.ui.components.SectionBanner
 import com.ritmo.app.ui.components.WeekStrip
@@ -57,10 +58,12 @@ fun TodayScreen(
     onCreate: () -> Unit,
 ) {
     if (state.todayRows.isEmpty() && state.otherRows.isEmpty()) {
+        val pet = Pets.byId(state.petId)
         EmptyMessage(
-            "Oi! Eu sou a Faísca.",
+            "Oi! Eu sou ${pet.article} ${pet.name}.",
             "Crie seu primeiro objetivo e vamos construir seu ritmo.",
-            state.accessoryId,
+            state.petId,
+            state.stage.index,
             Mood.HAPPY,
             action = "Criar objetivo",
             onAction = onCreate,
@@ -105,7 +108,7 @@ private fun TodayBanner(state: UiState) {
     SectionBanner(
         overline = LocalDate.ofEpochDay(state.today).format(dateFormat).replace("-feira", ""),
         title = state.speech,
-        side = { Faisca(state.mood, state.accessoryId, sizeDp = 84.dp) },
+        side = { Mascot(state.petId, state.stage.index, state.mood, sizeDp = 92.dp) },
         footer = {
             if (total > 0) {
                 Spacer(Modifier.height(10.dp))

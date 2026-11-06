@@ -36,7 +36,7 @@ object Achievements {
     )
 }
 
-enum class ShopKind { FREEZE, THEME, ACCESSORY }
+enum class ShopKind { FREEZE, REPAIR, THEME, PET }
 
 data class ShopItem(
     val id: String,
@@ -46,16 +46,45 @@ data class ShopItem(
     val kind: ShopKind,
 )
 
+/** Modo claro ou escuro; os temas Branco e Preto ignoram esta escolha. */
+enum class ThemeMode(val label: String) {
+    SYSTEM("Automático"),
+    LIGHT("Claro"),
+    DARK("Escuro"),
+}
+
+/** Personagem que acompanha o usuário. [id] nulo é a Faísca, que vem de graça. */
+data class Pet(val id: String?, val name: String, val article: String)
+
+object Pets {
+    const val RAIO = "pet_raio"
+    const val LUZ = "pet_luz"
+    const val MAROMBA = "pet_maromba"
+
+    val default = Pet(null, "Faísca", "a")
+    val all = listOf(default, Pet(RAIO, "Raio", "o"), Pet(LUZ, "Luz", "a"), Pet(MAROMBA, "Maromba", "o"))
+
+    fun byId(id: String?) = all.firstOrNull { it.id == id } ?: default
+}
+
 object Shop {
     const val FREEZE_ID = "freeze"
+    const val REPAIR_ID = "streak_repair"
     val items = listOf(
         ShopItem(FREEZE_ID, "Bloqueio de streak", "Protege seus streaks em um dia perdido", 50, ShopKind.FREEZE),
+        ShopItem(
+            REPAIR_ID,
+            "Retomar sequência",
+            "Recupera um streak quebrado nos últimos ${Streaks.REPAIR_WINDOW_DAYS} dias",
+            100,
+            ShopKind.REPAIR,
+        ),
+        ShopItem(Pets.RAIO, "Raio", "Elétrico e sempre pronto para a próxima", 150, ShopKind.PET),
+        ShopItem(Pets.LUZ, "Luz", "Serena, ilumina até os dias difíceis", 150, ShopKind.PET),
+        ShopItem(Pets.MAROMBA, "Maromba", "Fogo bruto que não pula um dia de treino", 300, ShopKind.PET),
         ShopItem("theme_ocean", "Tema Azul", "Azul profundo com detalhes em branco", 100, ShopKind.THEME),
         ShopItem("theme_white", "Tema Branco", "Branco limpo com detalhes em roxo", 100, ShopKind.THEME),
         ShopItem("theme_black", "Tema Preto", "Preto total com detalhes em menta", 100, ShopKind.THEME),
-        ShopItem("acc_glasses", "Óculos escuros", "A Faísca fica estilosa", 150, ShopKind.ACCESSORY),
-        ShopItem("acc_party", "Chapéu de festa", "Todo dia é uma comemoração", 150, ShopKind.ACCESSORY),
-        ShopItem("acc_crown", "Coroa", "Para quem mantém o ritmo", 300, ShopKind.ACCESSORY),
     )
 }
 

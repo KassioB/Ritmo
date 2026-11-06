@@ -8,6 +8,9 @@ data class DayRecord(val objectiveId: Long, val day: Long, val status: DayStatus
 
 data class Streak(val current: Int, val best: Int)
 
+/** O que retomar a sequência devolve: [days] viram dias protegidos e o streak volta a [streak]. */
+data class StreakRepair(val days: List<Long>, val streak: Int)
+
 /**
  * Regras de streak. Dias são `LocalDate.toEpochDay()`.
  *
@@ -16,6 +19,8 @@ data class Streak(val current: Int, val best: Int)
  * - Hoje só conta quando concluído: enquanto pendente, não quebra nada.
  */
 object Streaks {
+    /** Até quantos dias atrás uma quebra ainda pode ser desfeita na loja. */
+    const val REPAIR_WINDOW_DAYS = 3
 
     fun forObjective(objectiveId: Long, records: List<DayRecord>): Streak =
         walk(records.filter { it.objectiveId == objectiveId }.sortedBy { it.day }.map { it.status })
@@ -32,6 +37,31 @@ object Streaks {
             .values
             .map { day -> dayOutcome(day.map { it.status }) }
         return walk(if (todayComplete) closedDays + DayStatus.DONE else closedDays)
+    }
+
+    /**
+     * A quebra mais recente do streak principal, se ainda der para desfazê-la. Retomar vale como
+     * um bloqueio usado depois: a falha vira dia protegido, que mantém o streak sem somar. Só
+     * serve para um tropeço recente; uma ausência maior que a janela fica como está.
+     */
+    fun repairable(records: List<DayRecord>, today: Long, todayComplete: Boolean): StreakRepair? {
+        val closed = records.filter { it.day < today }
+            .groupBy { it.day }
+            .toSortedMap()
+            .map { (day, list) -> day to dayOutcome(list.map { it.status }) }
+        val lastBreak = closed.indexOfLast { (_, outcome) -> outcome == DayStatus.MISSED }
+        if (lastBreak < 0) return null
+        val gap = closed.take(lastBreak + 1)
+            .takeLastWhile { (_, outcome) -> outcome != DayStatus.DONE }
+            .filter { (_, outcome) -> outcome == DayStatus.MISSED }
+            .map { (day, _) -> day }
+        if (gap.first() < today - REPAIR_WINDOW_DAYS) return null
+
+        val repaired = records.map {
+            if (it.day in gap && it.status == DayStatus.MISSED) it.copy(status = DayStatus.FROZEN) else it
+        }
+        val streak = main(repaired, today, todayComplete).current
+        return StreakRepair(gap, streak).takeIf { streak > main(records, today, todayComplete).current }
     }
 
     /** Resultado do dia inteiro: uma falha pesa mais que um bloqueio, que pesa mais que concluir. */

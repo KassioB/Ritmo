@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.MonetizationOn
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,6 +76,9 @@ private val ChunkShape = RoundedCornerShape(16.dp)
 private val LipDepth = 4.dp
 private val BannerLip = 5.dp
 val PtBr: Locale = Locale.forLanguageTag("pt-BR")
+
+/** Preferência "Vibrar ao concluir". */
+val LocalVibration = staticCompositionLocalOf { true }
 
 /** Botão em relevo: a borda inferior dá volume e a face afunda sobre ela ao pressionar. */
 @Composable
@@ -322,6 +327,7 @@ fun CheckToggle(
 ) {
     val brand = Ritmo.brand
     val haptics = LocalHapticFeedback.current
+    val vibrate = LocalVibration.current
     val pop by animateFloatAsState(
         if (done) 1.12f else 1f,
         spring(dampingRatio = Spring.DampingRatioMediumBouncy),
@@ -333,7 +339,7 @@ fun CheckToggle(
             .size(48.dp)
             .clip(CircleShape)
             .clickable {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                if (vibrate) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 onClick()
             }
             .semantics {
@@ -365,6 +371,7 @@ fun RitmoHeader(
     onStreak: () -> Unit,
     onShop: () -> Unit,
     onLevel: () -> Unit,
+    onSettings: () -> Unit,
 ) {
     val brand = Ritmo.brand
     Row(
@@ -379,6 +386,9 @@ fun RitmoHeader(
         HeaderStat(Icons.Rounded.AcUnit, brand.freeze, "$freezes", "Bloqueios: $freezes", onShop)
         HeaderStat(Icons.Rounded.MonetizationOn, brand.coin, "$coins", "Moedas: $coins", onShop)
         HeaderStat(Icons.Rounded.Bolt, brand.level, "$level", "Nível $level", onLevel)
+        IconButton(onClick = onSettings) {
+            Icon(Icons.Rounded.Settings, contentDescription = "Configurações", tint = brand.onHeader)
+        }
     }
 }
 

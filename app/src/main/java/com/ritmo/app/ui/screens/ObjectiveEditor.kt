@@ -3,7 +3,6 @@ package com.ritmo.app.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.background
@@ -60,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.ritmo.app.data.Objective
 import com.ritmo.app.domain.Difficulty
@@ -357,14 +357,20 @@ private fun ReminderNotices() {
         }
     } else if (!exact && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         NoticeRow("Sem a permissão de alarmes, um lembrete pode atrasar até 1 hora.", "Permitir") {
-            context.startActivity(
-                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}")),
-            )
+            openExactAlarmSettings(context)
         }
     }
 }
 
-private fun openNotificationSettings(context: Context) {
+fun openExactAlarmSettings(context: Context) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        context.startActivity(
+            Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, "package:${context.packageName}".toUri()),
+        )
+    }
+}
+
+fun openNotificationSettings(context: Context) {
     context.startActivity(
         Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
             .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
@@ -377,7 +383,12 @@ private fun openNotificationSettings(context: Context) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ReminderDialog(start: Int, onConfirm: (Int) -> Unit, onDismiss: () -> Unit) {
+fun ReminderDialog(
+    start: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit,
+    title: String = "Horário do lembrete",
+) {
     val picker = rememberTimePickerState(start / 60, start % 60, is24Hour = true)
     Dialog(
         onDismissRequest = onDismiss,
@@ -397,7 +408,7 @@ private fun ReminderDialog(start: Int, onConfirm: (Int) -> Unit, onDismiss: () -
                 // Deitado, a altura mal comporta o relógio e os botões.
                 if (LocalConfiguration.current.orientation != Configuration.ORIENTATION_LANDSCAPE) {
                     Text(
-                        "Horário do lembrete",
+                        title,
                         style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.padding(bottom = 12.dp),
                     )

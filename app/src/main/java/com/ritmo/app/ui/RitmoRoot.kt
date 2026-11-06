@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.EmojiEvents
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -33,19 +35,23 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ritmo.app.domain.ThemeMode
 import com.ritmo.app.ui.components.Celebration
 import com.ritmo.app.ui.components.CelebrationDialog
 import com.ritmo.app.ui.components.ChunkyFab
+import com.ritmo.app.ui.components.LocalVibration
 import com.ritmo.app.ui.components.NavItem
 import com.ritmo.app.ui.components.RewardPill
 import com.ritmo.app.ui.components.RitmoBottomBar
 import com.ritmo.app.ui.components.RitmoHeader
 import com.ritmo.app.ui.screens.CalendarScreen
+import com.ritmo.app.ui.screens.DashboardScreen
 import com.ritmo.app.ui.screens.ListDetailScreen
 import com.ritmo.app.ui.screens.ListEditor
 import com.ritmo.app.ui.screens.ListsScreen
 import com.ritmo.app.ui.screens.ObjectiveEditor
 import com.ritmo.app.ui.screens.ProfileScreen
+import com.ritmo.app.ui.screens.SettingsScreen
 import com.ritmo.app.ui.screens.ShopScreen
 import com.ritmo.app.ui.screens.TodayScreen
 import com.ritmo.app.ui.theme.ObjectiveColors
@@ -56,6 +62,7 @@ import kotlinx.coroutines.delay
 private enum class Tab(val label: String, val icon: ImageVector) {
     TODAY("Hoje", Icons.Rounded.Home),
     LISTS("Listas", Icons.Rounded.Checklist),
+    DASHBOARD("Dashboard", Icons.Rounded.BarChart),
     CALENDAR("Calendário", Icons.Rounded.CalendarMonth),
     PROFILE("Conquistas", Icons.Rounded.EmojiEvents),
     SHOP("Loja", Icons.Rounded.Storefront),
@@ -74,6 +81,7 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
     var objectiveEditor by rememberSaveable { mutableStateOf<Long?>(null) }
     var listEditor by rememberSaveable { mutableStateOf<Long?>(null) }
     var openList by rememberSaveable { mutableStateOf<Long?>(null) }
+    var settingsOpen by rememberSaveable { mutableStateOf(false) }
 
     var reward by remember { mutableStateOf<String?>(null) }
     var rewardSerial by remember { mutableIntStateOf(0) }
@@ -97,9 +105,10 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
         }
     }
 
-    RitmoTheme(current?.themeId) {
+    RitmoTheme(current?.themeId, current?.settings?.themeMode ?: ThemeMode.SYSTEM) {
         val scheme = MaterialTheme.colorScheme
         val brand = Ritmo.brand
+        CompositionLocalProvider(LocalVibration provides (current?.settings?.hapticsEnabled ?: true)) {
         Box(Modifier.fillMaxSize().background(scheme.background)) {
             Scaffold(
                 containerColor = scheme.background,
@@ -113,6 +122,7 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
                             onStreak = { tab = Tab.CALENDAR },
                             onShop = { tab = Tab.SHOP },
                             onLevel = { tab = Tab.PROFILE },
+                            onSettings = { settingsOpen = true },
                         )
                     }
                 },
@@ -120,6 +130,7 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
                     val tints = listOf(
                         scheme.primary,
                         brand.doneText,
+                        ObjectiveColors[1],
                         ObjectiveColors[3],
                         ObjectiveColors[4],
                         ObjectiveColors[5],
@@ -154,6 +165,7 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
                                 onOpen = { openList = it },
                                 onCreate = { listEditor = NEW },
                             )
+                            Tab.DASHBOARD -> DashboardScreen(current)
                             Tab.CALENDAR -> CalendarScreen(current)
                             Tab.PROFILE -> ProfileScreen(current)
                             Tab.SHOP -> ShopScreen(current, viewModel::buy, viewModel::toggleEquipped)
@@ -190,6 +202,17 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
                         onClose = { listEditor = null },
                     )
                 }
+                Page(if (settingsOpen) Unit else null) {
+                    SettingsScreen(
+                        state = current,
+                        onChange = viewModel::updateSettings,
+                        onOpenShop = {
+                            settingsOpen = false
+                            tab = Tab.SHOP
+                        },
+                        onBack = { settingsOpen = false },
+                    )
+                }
                 Page(objectiveEditor) { id ->
                     val row = (current.todayRows + current.otherRows).firstOrNull { it.objective.id == id }
                     ObjectiveEditor(
@@ -221,11 +244,12 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
                 RewardPill(reward.orEmpty())
             }
         }
+        }
 
         if (current != null) {
             celebrations.firstOrNull()?.let { celebration ->
                 // Um toque fora pode dispensar duas vezes; remover pelo item torna isso inofensivo.
-                CelebrationDialog(celebration, current.accessoryId) {
+                CelebrationDialog(celebration, current.petId, current.stage.index) {
                     celebrations.remove(celebration)
                 }
             }

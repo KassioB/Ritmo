@@ -7,21 +7,31 @@ import com.ritmo.app.RitmoApp
 import com.ritmo.app.data.Checklist
 import com.ritmo.app.data.ChecklistItem
 import com.ritmo.app.data.Objective
+import com.ritmo.app.data.Settings
 import com.ritmo.app.data.Snapshot
 import com.ritmo.app.data.ToggleOutcome
 import com.ritmo.app.domain.Achievement
+import com.ritmo.app.domain.DayRecord
 import com.ritmo.app.domain.DayStatus
+import com.ritmo.app.domain.DaySummary
 import com.ritmo.app.domain.Difficulty
+import com.ritmo.app.domain.Evolution
+import com.ritmo.app.domain.EvolutionStage
+import com.ritmo.app.domain.Insights
 import com.ritmo.app.domain.LevelInfo
+import com.ritmo.app.domain.ObjectiveInfo
+import com.ritmo.app.domain.Mood
+import com.ritmo.app.domain.Pets
 import com.ritmo.app.domain.Progression
 import com.ritmo.app.domain.ShopItem
+import com.ritmo.app.domain.ShopKind
 import com.ritmo.app.domain.Stats
 import com.ritmo.app.domain.Streak
+import com.ritmo.app.domain.StreakRepair
 import com.ritmo.app.domain.Streaks
 import com.ritmo.app.domain.dias
 import com.ritmo.app.notifications.Reminders
 import com.ritmo.app.ui.components.Celebration
-import com.ritmo.app.ui.components.Mood
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +50,13 @@ data class ListRow(val list: Checklist, val pending: List<ChecklistItem>, val do
     val progress get() = if (total == 0) 0f else done.size.toFloat() / total
 }
 
+/** O histórico bruto que o Dashboard recorta por período. */
+data class History(
+    val days: Map<Long, DaySummary>,
+    val records: List<DayRecord>,
+    val objectives: Map<Long, ObjectiveInfo>,
+)
+
 data class UiState(
     val today: Long,
     val todayRows: List<ObjectiveRow>,
@@ -54,13 +71,18 @@ data class UiState(
     val stats: Stats,
     val unlocked: Set<String>,
     val owned: Set<String>,
-    val themeId: String?,
-    val accessoryId: String?,
+    val settings: Settings,
+    val stage: EvolutionStage,
+    val history: History,
     val dayOutcomes: Map<Long, DayStatus>,
     val records: Map<Long, List<Pair<String, DayStatus>>>,
     val mood: Mood,
     val speech: String,
-)
+    val streakRepair: StreakRepair?,
+) {
+    val themeId get() = settings.themeId
+    val petId get() = settings.petId
+}
 
 sealed interface AppEvent {
     data class Reward(val text: String) : AppEvent
@@ -153,6 +175,18 @@ class RitmoViewModel(application: Application) : AndroidViewModel(application) {
                 ),
             )
         }
+        outcome.evolvedTo?.let { stage ->
+            val pet = Pets.byId(repository.load()?.settings?.petId)
+            val article = pet.article.replaceFirstChar { it.uppercase() }
+            eventChannel.send(
+                AppEvent.Celebrate(
+                    Celebration(
+                        "Evoluiu: ${stage.name}!",
+                        "${dias(stage.minStreak)} seguidos no ritmo. $article ${pet.name} está mais forte.",
+                    ),
+                ),
+            )
+        }
         outcome.newLevel?.let {
             eventChannel.send(
                 AppEvent.Celebrate(Celebration("Nível $it!", "Você subiu de nível. Continue no ritmo.")),
@@ -202,13 +236,27 @@ class RitmoViewModel(application: Application) : AndroidViewModel(application) {
     fun buy(item: ShopItem) {
         viewModelScope.launch {
             val achievements = repository.buy(item, today.value) ?: return@launch
-            eventChannel.send(AppEvent.Reward("Comprado: ${item.name}"))
+            if (item.kind == ShopKind.REPAIR) {
+                val streak = repository.load()?.mainStreak(today.value)?.current ?: 0
+                eventChannel.send(
+                    AppEvent.Celebrate(Celebration("Sequência retomada!", "Seu streak voltou para ${dias(streak)}.")),
+                )
+            } else {
+                eventChannel.send(AppEvent.Reward("Comprado: ${item.name}"))
+            }
             achievements.forEach { announce(it) }
         }
     }
 
     fun toggleEquipped(item: ShopItem) {
         viewModelScope.launch { repository.toggleEquipped(item) }
+    }
+
+    fun updateSettings(change: (Settings) -> Settings) {
+        viewModelScope.launch {
+            repository.updateSettings(change)
+            syncReminders(edited = true)
+        }
     }
 
     private suspend fun announce(achievement: Achievement) {
@@ -224,7 +272,7 @@ class RitmoViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun syncReminders(edited: Boolean = false) {
         val state = repository.load() ?: return
-        Reminders.sync(getApplication(), state.objectives, edited)
+        Reminders.sync(getApplication(), state, edited)
     }
 
     private fun currentDay() = LocalDate.now().toEpochDay()
@@ -247,7 +295,7 @@ private fun Snapshot.toUi(day: Long): UiState {
         .mapValues { (_, list) -> Streaks.dayOutcome(list.map { it.status }) }
         .let { if (complete) it + (day to DayStatus.DONE) else it }
 
-    val (mood, speech) = moodFor(scheduled.size, complete, main, records.isNotEmpty(), scheduled.count { isDone(it.id, day) })
+    val feeling = feeling(day, LocalTime.now().hour)
 
     return UiState(
         today = day,
@@ -266,33 +314,29 @@ private fun Snapshot.toUi(day: Long): UiState {
         stats = stats(day),
         unlocked = unlocked.map { it.id }.toSet(),
         owned = owned,
-        themeId = settings.themeId,
-        accessoryId = settings.accessoryId,
+        settings = settings,
+        stage = Evolution.stageFor(main.current),
+        history = History(
+            days = Insights.days(
+                records,
+                ledger.filter { it.key.startsWith(Snapshot.ITEM) }.map { it.day },
+                ledger.groupBy { it.day }.mapValues { (_, entries) -> entries.sumOf { it.xp } },
+                day,
+                scheduled.count { !isDone(it.id, day) },
+                coinsByDay = ledger.filter { it.coins > 0 }
+                    .groupBy { it.day }
+                    .mapValues { (_, entries) -> entries.sumOf { it.coins } },
+                listDays = ledger.filter { it.key.startsWith(Snapshot.LIST_DONE) }.map { it.day },
+            ),
+            records = records,
+            objectives = objectives.associate { it.id to ObjectiveInfo(it.title, it.period, it.difficulty) },
+        ),
         dayOutcomes = outcomes,
         records = records.groupBy { it.day }
             .mapValues { (_, list) -> list.map { (titles[it.objectiveId] ?: "Objetivo") to it.status } },
-        mood = mood,
-        speech = speech,
+        mood = feeling.mood,
+        speech = feeling.speech,
+        streakRepair = streakRepair(day),
     )
-}
-
-private fun pendentes(count: Int) = if (count == 1) "Falta 1" else "Faltam $count"
-
-private fun moodFor(
-    scheduled: Int,
-    complete: Boolean,
-    main: Streak,
-    hasHistory: Boolean,
-    doneCount: Int,
-): Pair<Mood, String> {
-    val evening = LocalTime.now().hour >= 18
-    return when {
-        scheduled == 0 -> Mood.SLEEPY to "Nada para hoje. Aproveite o descanso!"
-        complete -> Mood.EXCITED to "Dia perfeito! Sou a Faísca mais feliz do mundo."
-        evening && main.current > 0 -> Mood.WORRIED to "Seu streak de ${dias(main.current)} está em risco!"
-        doneCount > 0 -> Mood.HAPPY to "Boa! ${pendentes(scheduled - doneCount)} para fechar o dia."
-        hasHistory && main.current == 0 && main.best > 0 -> Mood.SAD to "Tudo bem, recomeçar também é ritmo."
-        else -> Mood.HAPPY to if (scheduled == 1) "Vamos lá? Hoje é só 1 objetivo." else "Vamos lá? Hoje são $scheduled objetivos."
-    }
 }
 

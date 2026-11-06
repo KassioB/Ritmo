@@ -15,8 +15,8 @@ android {
         applicationId = "com.ritmo.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 4
+        versionName = "0.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -35,6 +35,13 @@ android {
     sourceSets {
         // Os testes de migração leem os esquemas exportados pelo Room.
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        // Gerado por tools/generate_pet_icons.py: são dezenas de atalhos, um por estado do pet.
+        variant.sources.manifests.addStaticManifestFile("src/main/pet-icons/AndroidManifest.xml")
     }
 }
 
