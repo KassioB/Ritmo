@@ -44,9 +44,11 @@ data class ShopItem(
     val description: String,
     val price: Int,
     val kind: ShopKind,
+    /** Não se compra com moedas: vem incluído no plano Pro. */
+    val proOnly: Boolean = false,
 )
 
-/** Modo claro ou escuro; os temas Branco e Preto ignoram esta escolha. */
+/** Modo claro ou escuro; os temas de cor fixa, como Branco e Preto, ignoram esta escolha. */
 enum class ThemeMode(val label: String) {
     SYSTEM("Automático"),
     LIGHT("Claro"),
@@ -70,22 +72,21 @@ object Pets {
 object Shop {
     const val FREEZE_ID = "freeze"
     const val REPAIR_ID = "streak_repair"
+    const val REPAIR_PRICE = 100
     val items = listOf(
         ShopItem(FREEZE_ID, "Bloqueio de streak", "Protege seus streaks em um dia perdido", 50, ShopKind.FREEZE),
-        ShopItem(
-            REPAIR_ID,
-            "Retomar sequência",
-            "Recupera um streak quebrado nos últimos ${Streaks.REPAIR_WINDOW_DAYS} dias",
-            100,
-            ShopKind.REPAIR,
-        ),
+        ShopItem(REPAIR_ID, "Retomar sequência", "Recupera um streak quebrado recente", REPAIR_PRICE, ShopKind.REPAIR),
         ShopItem(Pets.RAIO, "Raio", "Elétrico e sempre pronto para a próxima", 150, ShopKind.PET),
         ShopItem(Pets.LUZ, "Luz", "Serena, ilumina até os dias difíceis", 150, ShopKind.PET),
         ShopItem(Pets.MAROMBA, "Maromba", "Fogo bruto que não pula um dia de treino", 300, ShopKind.PET),
         ShopItem("theme_ocean", "Tema Azul", "Azul profundo com detalhes em branco", 100, ShopKind.THEME),
         ShopItem("theme_white", "Tema Branco", "Branco limpo com detalhes em roxo", 100, ShopKind.THEME),
         ShopItem("theme_black", "Tema Preto", "Preto total com detalhes em menta", 100, ShopKind.THEME),
+        ShopItem("theme_gold", "Tema Ouro", "Noite escura com detalhes dourados", 0, ShopKind.THEME, proOnly = true),
+        ShopItem("theme_emerald", "Tema Esmeralda", "Verde profundo e sereno", 0, ShopKind.THEME, proOnly = true),
     )
+
+    fun isProOnly(id: String) = items.any { it.id == id && it.proOnly }
 }
 
 data class IconGroup(val name: String, val icons: List<String>)

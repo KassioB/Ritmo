@@ -28,7 +28,9 @@ import androidx.compose.material.icons.automirrored.rounded.TrendingDown
 import androidx.compose.material.icons.automirrored.rounded.TrendingFlat
 import androidx.compose.material.icons.automirrored.rounded.TrendingUp
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Lightbulb
 import androidx.compose.material.icons.rounded.LocalFireDepartment
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -128,8 +130,11 @@ private fun tarefas(count: Int) = if (count == 1) "1 tarefa" else "$count tarefa
 private fun percent(rate: Float) = "${(rate * 100).roundToInt()}%"
 
 @Composable
-fun DashboardScreen(state: UiState) {
-    var range by rememberSaveable { mutableStateOf(Range.WEEK) }
+fun DashboardScreen(state: UiState, onOpenPro: (String) -> Unit) {
+    val plan = state.plan
+    var chosenRange by rememberSaveable { mutableStateOf(Range.WEEK) }
+    // Quem sai do Pro com o mês aberto volta para a semana em vez de ficar numa visão bloqueada.
+    val range = chosenRange.takeIf { it in plan.ranges } ?: Range.WEEK
     var anchor by rememberSaveable { mutableStateOf(state.today) }
     val weekStart = if (state.settings.weekStartsMonday) DayOfWeek.MONDAY else DayOfWeek.SUNDAY
     val report = remember(state.history, range, anchor, weekStart, state.today) {
@@ -152,11 +157,13 @@ fun DashboardScreen(state: UiState) {
         item(key = "filtro") {
             PeriodFilter(
                 report = report,
+                available = plan.ranges,
                 canAdvance = report.end.toEpochDay() < state.today,
                 onRange = {
-                    range = it
+                    chosenRange = it
                     anchor = state.today
                 },
+                onLocked = { onOpenPro(ProReason.RANGES) },
                 onShift = { anchor = Insights.shift(range, date(anchor), it.toLong()).toEpochDay() },
             )
         }
@@ -176,18 +183,27 @@ fun DashboardScreen(state: UiState) {
             item(key = "resumo") { Headline(report) }
             item(key = "numeros") { KpiGrid(report) }
             item(key = "grafico") { ChartCard(report, weekStart) }
-            item(key = "detalhes") { DetailsCard(report) }
+            if (plan.isPro) {
+                item(key = "dicas") { TipsCard(report) }
+                item(key = "detalhes") { DetailsCard(report) }
+            } else {
+                item(key = "pro") {
+                    ProPromo("Entenda seu ritmo", "Mês e ano, dicas e análises por dia, turno e dificuldade.") {
+                        onOpenPro(ProReason.NONE)
+                    }
+                }
+            }
             item(key = "pico") { PeakCard(report) }
             item(key = "recaidas") { LapsesCard(report) }
             item(key = "falhas") { FailedDaysCard(report, state.records) }
             // Na semana cada dia aparece uma vez só, e o gráfico de cima já mostra isso.
-            if (report.range != Range.WEEK && report.byWeekday.isNotEmpty()) {
+            if (plan.isPro && report.range != Range.WEEK && report.byWeekday.isNotEmpty()) {
                 item(key = "dias-da-semana") { WeekdayCard(report) }
             }
-            if (report.byPeriod.size >= MIN_GROUPS) {
+            if (plan.isPro && report.byPeriod.size >= MIN_GROUPS) {
                 item(key = "turnos") { ScoresCard("Por turno", report.byPeriod) }
             }
-            if (report.byDifficulty.size >= MIN_GROUPS) {
+            if (plan.isPro && report.byDifficulty.size >= MIN_GROUPS) {
                 item(key = "dificuldades") { ScoresCard("Por dificuldade", report.byDifficulty) }
             }
             if (report.byObjective.isNotEmpty()) {
@@ -201,15 +217,29 @@ fun DashboardScreen(state: UiState) {
 @Composable
 private fun PeriodFilter(
     report: Report,
+    available: List<Range>,
     canAdvance: Boolean,
     onRange: (Range) -> Unit,
+    onLocked: () -> Unit,
     onShift: (Int) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Range.entries.forEach { option ->
-                ChoiceTile(report.range == option, { onRange(option) }, Modifier.weight(1f)) {
-                    Text(option.label, style = MaterialTheme.typography.labelLarge)
+                val locked = option !in available
+                ChoiceTile(report.range == option, { if (locked) onLocked() else onRange(option) }, Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (locked) {
+                            Icon(
+                                Icons.Rounded.Lock,
+                                contentDescription = "Disponível no Pro",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                        }
+                        Text(option.label, style = MaterialTheme.typography.labelLarge)
+                    }
                 }
             }
         }
@@ -689,6 +719,21 @@ private fun missedTitles(day: DaySummary, records: Map<Long, List<Pair<String, D
     val missed = records[day.day].orEmpty().filter { it.second != DayStatus.DONE }
     return missed.joinToString { (title, status) ->
         if (status == DayStatus.FROZEN) "$title (protegido)" else title
+    }
+}
+
+@Composable
+private fun TipsCard(report: Report) {
+    val brand = Ritmo.brand
+    GroupCard(title = "Dicas para você") {
+        Column(
+            Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Insights.tips(report).forEach { tip ->
+                InsightLine(Icons.Rounded.Lightbulb, brand.chartDone, tip.title, tip.advice)
+            }
+        }
     }
 }
 

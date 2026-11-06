@@ -50,6 +50,8 @@ import com.ritmo.app.ui.screens.ListDetailScreen
 import com.ritmo.app.ui.screens.ListEditor
 import com.ritmo.app.ui.screens.ListsScreen
 import com.ritmo.app.ui.screens.ObjectiveEditor
+import com.ritmo.app.ui.screens.ProReason
+import com.ritmo.app.ui.screens.ProScreen
 import com.ritmo.app.ui.screens.ProfileScreen
 import com.ritmo.app.ui.screens.SettingsScreen
 import com.ritmo.app.ui.screens.ShopScreen
@@ -82,6 +84,7 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
     var listEditor by rememberSaveable { mutableStateOf<Long?>(null) }
     var openList by rememberSaveable { mutableStateOf<Long?>(null) }
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var proReason by rememberSaveable { mutableStateOf<String?>(null) }
 
     var reward by remember { mutableStateOf<String?>(null) }
     var rewardSerial by remember { mutableIntStateOf(0) }
@@ -143,9 +146,22 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
                 },
                 floatingActionButton = {
                     if (current != null) {
+                        val plan = current.plan
                         when (tab) {
-                            Tab.TODAY -> ChunkyFab("Novo objetivo", { objectiveEditor = NEW })
-                            Tab.LISTS -> ChunkyFab("Nova lista", { listEditor = NEW })
+                            Tab.TODAY -> ChunkyFab("Novo objetivo", {
+                                if (plan.canAddObjective(current.activeObjectives)) {
+                                    objectiveEditor = NEW
+                                } else {
+                                    proReason = ProReason.objectives(plan)
+                                }
+                            })
+                            Tab.LISTS -> ChunkyFab("Nova lista", {
+                                if (plan.canAddList(current.lists.size)) {
+                                    listEditor = NEW
+                                } else {
+                                    proReason = ProReason.lists(plan)
+                                }
+                            })
                             else -> Unit
                         }
                     }
@@ -165,10 +181,12 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
                                 onOpen = { openList = it },
                                 onCreate = { listEditor = NEW },
                             )
-                            Tab.DASHBOARD -> DashboardScreen(current)
+                            Tab.DASHBOARD -> DashboardScreen(current) { proReason = it }
                             Tab.CALENDAR -> CalendarScreen(current)
                             Tab.PROFILE -> ProfileScreen(current)
-                            Tab.SHOP -> ShopScreen(current, viewModel::buy, viewModel::toggleEquipped)
+                            Tab.SHOP -> ShopScreen(current, viewModel::buy, viewModel::toggleEquipped) {
+                                proReason = it
+                            }
                         }
                     }
                 }
@@ -180,6 +198,8 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
                         row = row,
                         onBack = { openList = null },
                         onToggle = viewModel::toggleItem,
+                        canAdd = current.plan.canAddItem(row.total),
+                        onLimit = { proReason = ProReason.items(current.plan) },
                         onAdd = { title, difficulty -> viewModel.addItem(row.list.id, title, difficulty) },
                         onUpdateItem = viewModel::updateItem,
                         onDeleteItem = viewModel::deleteItem,
@@ -210,6 +230,8 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
                             settingsOpen = false
                             tab = Tab.SHOP
                         },
+                        onOpenPro = { proReason = it },
+                        onExport = viewModel::exportHistory,
                         onBack = { settingsOpen = false },
                     )
                 }
@@ -219,6 +241,8 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
                         objective = row?.objective,
                         streak = row?.streak,
                         today = current.today,
+                        plan = current.plan,
+                        onReminderLimit = { proReason = ProReason.reminders(current.plan) },
                         onSave = {
                             viewModel.save(it)
                             objectiveEditor = null
@@ -228,6 +252,22 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
                             objectiveEditor = null
                         },
                         onClose = { objectiveEditor = null },
+                    )
+                }
+                // Por último para abrir por cima de qualquer tela, sem perder o que estava nela.
+                Page(proReason) { reason ->
+                    ProScreen(
+                        state = current,
+                        reason = reason,
+                        onActivate = {
+                            viewModel.setPro(true)
+                            proReason = null
+                        },
+                        onDeactivate = {
+                            viewModel.setPro(false)
+                            proReason = null
+                        },
+                        onClose = { proReason = null },
                     )
                 }
             }

@@ -11,7 +11,9 @@ import com.ritmo.app.domain.Evolution
 import com.ritmo.app.domain.EvolutionStage
 import com.ritmo.app.domain.PetFeeling
 import com.ritmo.app.domain.PetMood
+import com.ritmo.app.domain.Plan
 import com.ritmo.app.domain.Progression
+import com.ritmo.app.domain.Shop
 import com.ritmo.app.domain.ShopItem
 import com.ritmo.app.domain.ShopKind
 import com.ritmo.app.domain.Stats
@@ -20,6 +22,8 @@ import com.ritmo.app.domain.Streaks
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
+import java.time.LocalDate
+import java.time.YearMonth
 
 /** Foto do banco; todo o estado derivado (streaks, nível, saldo) é calculado a partir dela. */
 data class Snapshot(
@@ -35,6 +39,7 @@ data class Snapshot(
     val coins get() = ledger.sumOf { it.coins }
     val freezes get() = ledger.sumOf { it.freezes }
     val owned get() = ledger.filter { it.key.startsWith(PURCHASE) }.map { it.key.removePrefix(PURCHASE) }.toSet()
+    val plan get() = Plan.of(settings.isPro)
 
     fun scheduledOn(day: Long) = objectives.filter { it.isScheduledOn(day) }
 
@@ -48,7 +53,7 @@ data class Snapshot(
 
     fun mainStreak(today: Long): Streak = Streaks.main(records, today, isComplete(today))
 
-    fun streakRepair(today: Long) = Streaks.repairable(records, today, isComplete(today))
+    fun streakRepair(today: Long) = Streaks.repairable(records, today, isComplete(today), plan.repairWindowDays)
 
     /** Como o pet está em [hour]; vale para a mascote e para o ícone do app. */
     fun feeling(today: Long, hour: Int): PetFeeling {
@@ -94,6 +99,7 @@ data class Snapshot(
         const val ITEM = "item:"
         const val LIST_DONE = "list-done:"
         const val STREAK_REPAIR = "streak-repair:"
+        const val PRO_FREEZE = "pro-freeze:"
         private val PAID = listOf(PURCHASE, FREEZE_BOUGHT, STREAK_REPAIR)
     }
 }
@@ -185,9 +191,8 @@ class RitmoRepository(private val db: RitmoDatabase) {
             dao.deleteLedger(key)
         } else {
             dao.saveRecords(listOf(DayRecordRow(objectiveId, today, DayStatus.DONE)))
-            dao.addLedger(
-                LedgerEntry(key, objective.difficulty.xp, objective.difficulty.coins, day = today),
-            )
+            val coins = objective.difficulty.coins * before.plan.coinMultiplier
+            dao.addLedger(LedgerEntry(key, objective.difficulty.xp, coins, day = today))
         }
         syncPerfectDay(today)
         outcome(before, today)
@@ -209,7 +214,8 @@ class RitmoRepository(private val db: RitmoDatabase) {
             dao.deleteLedger(key)
         } else {
             dao.saveItem(item.copy(doneDay = today))
-            dao.addLedger(LedgerEntry(key, item.difficulty.xp, item.difficulty.coins, day = today))
+            val coins = item.difficulty.coins * before.plan.coinMultiplier
+            dao.addLedger(LedgerEntry(key, item.difficulty.xp, coins, day = today))
         }
         val complete = syncListBonus(item.listId, today)
         val finished = if (complete && !wasDone) dao.list(item.listId)?.title else null
@@ -256,13 +262,14 @@ class RitmoRepository(private val db: RitmoDatabase) {
     /** Devolve as conquistas liberadas pela compra, ou `null` se ela não aconteceu. */
     suspend fun buy(item: ShopItem, today: Long): List<Achievement>? = db.withTransaction {
         val state = load() ?: return@withTransaction null
-        if (state.coins < item.price) return@withTransaction null
+        val price = state.plan.priceOf(item)
+        if (state.coins < price || item.proOnly) return@withTransaction null
         when (item.kind) {
             ShopKind.FREEZE -> {
-                if (state.freezes >= Progression.MAX_FREEZES) return@withTransaction null
+                if (state.freezes >= state.plan.maxFreezes) return@withTransaction null
                 val serial = state.ledger.count { it.key.startsWith(Snapshot.FREEZE_BOUGHT) }
                 dao.addLedger(
-                    LedgerEntry("${Snapshot.FREEZE_BOUGHT}$serial", coins = -item.price, freezes = 1, day = today),
+                    LedgerEntry("${Snapshot.FREEZE_BOUGHT}$serial", coins = -price, freezes = 1, day = today),
                 )
             }
             ShopKind.REPAIR -> {
@@ -272,16 +279,40 @@ class RitmoRepository(private val db: RitmoDatabase) {
                         .map { DayRecordRow(it.objectiveId, it.day, DayStatus.FROZEN) },
                 )
                 dao.addLedger(
-                    LedgerEntry("${Snapshot.STREAK_REPAIR}${repair.days.first()}", coins = -item.price, day = today),
+                    LedgerEntry("${Snapshot.STREAK_REPAIR}${repair.days.first()}", coins = -price, day = today),
                 )
             }
             ShopKind.THEME, ShopKind.PET -> {
                 if (item.id in state.owned) return@withTransaction null
-                dao.addLedger(LedgerEntry("${Snapshot.PURCHASE}${item.id}", coins = -item.price, day = today))
+                dao.addLedger(LedgerEntry("${Snapshot.PURCHASE}${item.id}", coins = -price, day = today))
                 equip(item, state.settings)
             }
         }
         unlockAchievements(today)
+    }
+
+    /**
+     * Liga ou desliga o Pro. Sair do plano não apaga nada: só o tema exclusivo volta ao padrão.
+     * Devolve quantos bloqueios de presente entraram.
+     */
+    suspend fun setPro(active: Boolean, today: Long): Int = db.withTransaction {
+        val settings = dao.settings() ?: return@withTransaction 0
+        val theme = settings.themeId?.takeUnless { !active && Shop.isProOnly(it) }
+        dao.saveSettings(settings.copy(isPro = active, themeId = theme))
+        grantMonthlyFreezes(today)
+    }
+
+    /**
+     * Bloqueios de presente do Pro, sem passar do que cabe. A chave do mês garante uma entrega só,
+     * mesmo que o plano seja desligado e ligado de novo.
+     */
+    suspend fun grantMonthlyFreezes(today: Long): Int = db.withTransaction {
+        val state = load() ?: return@withTransaction 0
+        val key = "${Snapshot.PRO_FREEZE}${YearMonth.from(LocalDate.ofEpochDay(today))}"
+        if (!state.plan.isPro || state.ledger.any { it.key == key }) return@withTransaction 0
+        val granted = minOf(state.plan.monthlyFreezes, state.plan.maxFreezes - state.freezes).coerceAtLeast(0)
+        dao.addLedger(LedgerEntry(key, freezes = granted, day = today))
+        granted
     }
 
     suspend fun updateSettings(change: (Settings) -> Settings) {
@@ -338,9 +369,8 @@ class RitmoRepository(private val db: RitmoDatabase) {
         val state = load() ?: return
         val key = "${Snapshot.PERFECT}$today"
         if (state.isComplete(today)) {
-            dao.addLedger(
-                LedgerEntry(key, Progression.PERFECT_DAY_XP, Progression.PERFECT_DAY_COINS, day = today),
-            )
+            val coins = Progression.PERFECT_DAY_COINS * state.plan.coinMultiplier
+            dao.addLedger(LedgerEntry(key, Progression.PERFECT_DAY_XP, coins, day = today))
         } else {
             dao.deleteLedger(key)
         }
@@ -352,9 +382,8 @@ class RitmoRepository(private val db: RitmoDatabase) {
         val complete = items.size >= Progression.MIN_ITEMS_FOR_LIST_BONUS && items.all { it.doneDay != null }
         val key = listDoneKey(listId, today)
         if (complete) {
-            dao.addLedger(
-                LedgerEntry(key, Progression.LIST_COMPLETE_XP, Progression.LIST_COMPLETE_COINS, day = today),
-            )
+            val coins = Progression.LIST_COMPLETE_COINS * Plan.of(dao.settings()?.isPro == true).coinMultiplier
+            dao.addLedger(LedgerEntry(key, Progression.LIST_COMPLETE_XP, coins, day = today))
         } else {
             dao.deleteLedger(key)
         }

@@ -89,6 +89,7 @@ data class Settings(
     val streakAlertMinutes: Int = ReminderPlan.DEFAULT_ALERT_MINUTES,
     val hapticsEnabled: Boolean = true,
     val weekStartsMonday: Boolean = false,
+    val isPro: Boolean = false,
 )
 
 /** Lista livre (compras, exercícios, estudos...), independente da rotina diária. */
@@ -280,6 +281,13 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+/** Versão 4: surge o plano Pro. Todo mundo começa no plano grátis, com o que já tinha. */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `settings` ADD COLUMN `isPro` INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [
         Objective::class,
@@ -290,7 +298,7 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         Checklist::class,
         ChecklistItem::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -300,7 +308,7 @@ abstract class RitmoDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): RitmoDatabase =
             Room.databaseBuilder(context, RitmoDatabase::class.java, "ritmo.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }
 }

@@ -52,7 +52,7 @@ class MigrationTest {
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.databaseBuilder(context, RitmoDatabase::class.java, name)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .allowMainThreadQueries()
             .build()
         try {
@@ -60,6 +60,40 @@ class MigrationTest {
             assertEquals(400, state.coins)
             assertEquals("theme_ocean", state.settings.themeId)
             assertNull(state.settings.petId)
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun everyoneStartsOnTheFreePlanAndKeepsTheirData() {
+        helper.createDatabase(name, 3).apply {
+            execSQL(
+                "INSERT INTO settings (id, lastClosedDay, themeId, petId, themeMode, remindersEnabled, " +
+                    "streakAlertEnabled, streakAlertMinutes, hapticsEnabled, weekStartsMonday) " +
+                    "VALUES (0, 20761, 'theme_ocean', 'pet_raio', 'DARK', 1, 0, 1140, 0, 1)",
+            )
+            execSQL("INSERT INTO ledger (`key`, xp, coins, freezes, day) VALUES ('earned', 120, 77, 2, 20700)")
+            close()
+        }
+        helper.runMigrationsAndValidate(name, 4, true, MIGRATION_3_4).close()
+
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val database = Room.databaseBuilder(context, RitmoDatabase::class.java, name)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val state = runBlocking { RitmoRepository(database).load() }!!
+            assertEquals(false, state.settings.isPro)
+            assertEquals("theme_ocean", state.settings.themeId)
+            assertEquals("pet_raio", state.settings.petId)
+            assertEquals(ThemeMode.DARK, state.settings.themeMode)
+            assertEquals(1140, state.settings.streakAlertMinutes)
+            assertEquals(true, state.settings.weekStartsMonday)
+            assertEquals(77, state.coins)
+            assertEquals(120, state.xp)
+            assertEquals(2, state.freezes)
         } finally {
             database.close()
         }
@@ -85,7 +119,7 @@ class MigrationTest {
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val database = Room.databaseBuilder(context, RitmoDatabase::class.java, name)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .allowMainThreadQueries()
             .build()
         try {

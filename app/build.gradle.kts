@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -5,6 +6,14 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+}
+
+// A chave e a senha ficam juntas fora do projeto. Sem elas, o APK de release sai sem assinatura.
+val signing = Properties().apply {
+    File(System.getProperty("user.home"), ".ritmo/signing.properties")
+        .takeIf { it.exists() }
+        ?.inputStream()
+        ?.use { load(it) }
 }
 
 android {
@@ -15,13 +24,25 @@ android {
         applicationId = "com.ritmo.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        signing.getProperty("storeFile")?.let { path ->
+            create("release") {
+                storeFile = file(path)
+                storePassword = signing.getProperty("storePassword")
+                keyAlias = signing.getProperty("keyAlias")
+                keyPassword = signing.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))

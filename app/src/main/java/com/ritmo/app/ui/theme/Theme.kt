@@ -53,6 +53,20 @@ private val ChartPurple = Color(0xFF8E7DFF)
 private val ChartCoral = Color(0xFFE0446C)
 private val ChartCoralDark = Color(0xFFEE4F78)
 
+// Temas exclusivos do Pro. O par do gráfico é o mesmo nos dois e passa no teste de daltonismo.
+private val Gold = Color(0xFFF2C14E)
+private val DeepGold = Color(0xFFC9972B)
+private val Walnut = Color(0xFF14110A)
+private val WalnutCard = Color(0xFF211C10)
+private val Cream = Color(0xFFFFF6E0)
+private val Emerald = Color(0xFF34D399)
+private val DeepEmerald = Color(0xFF0E9F6E)
+private val Pine = Color(0xFF06201A)
+private val PineCard = Color(0xFF0C2E26)
+private val Mist = Color(0xFFE8FFF7)
+private val ChartBlue = Color(0xFF3D9BE9)
+private val ChartRose = Color(0xFFEE5A78)
+
 /** Cores dos objetivos e das listas; o índice fica salvo, então novas cores entram no fim. */
 val ObjectiveColors = listOf(
     Purple,
@@ -327,12 +341,93 @@ private val Black = Look(
     ),
 )
 
+private val GoldLook = Look(
+    scheme(
+        dark = true,
+        background = Walnut,
+        card = WalnutCard,
+        raised = Color(0xFF322A17),
+        text = Cream,
+        muted = Color(0xFFCDBF9C),
+        line = Color(0xFF433821),
+        accent = Gold,
+        onAccent = Walnut,
+        accentTint = Color(0xFF443711),
+        error = Coral,
+    ),
+    BrandColors(
+        header = Walnut,
+        onHeader = Cream,
+        banner = Gold,
+        bannerLip = DeepGold,
+        onBanner = Walnut,
+        bannerSide = WalnutCard,
+        bannerFill = Walnut,
+        action = Gold,
+        actionLip = DeepGold,
+        onAction = Walnut,
+        streak = Gold,
+        freeze = Sky,
+        coin = Gold,
+        level = Cream,
+        done = Gold,
+        onDone = Walnut,
+        doneText = Gold,
+        missed = Coral,
+        chartDone = ChartBlue,
+        chartMissed = ChartRose,
+    ),
+)
+
+private val EmeraldLook = Look(
+    scheme(
+        dark = true,
+        background = Pine,
+        card = PineCard,
+        raised = Color(0xFF134338),
+        text = Mist,
+        muted = Color(0xFFA5CFC2),
+        line = Color(0xFF1C5546),
+        accent = Emerald,
+        onAccent = Pine,
+        accentTint = Color(0xFF14503F),
+        error = Coral,
+    ),
+    BrandColors(
+        header = Pine,
+        onHeader = Mist,
+        banner = Color(0xFF0F7A5C),
+        bannerLip = Color(0xFF0A5C45),
+        onBanner = Color.White,
+        bannerSide = PineCard,
+        bannerFill = Emerald,
+        action = Emerald,
+        actionLip = DeepEmerald,
+        onAction = Pine,
+        streak = Emerald,
+        freeze = Sky,
+        coin = Emerald,
+        level = Mist,
+        done = Emerald,
+        onDone = Pine,
+        doneText = Emerald,
+        missed = Coral,
+        chartDone = ChartBlue,
+        chartMissed = ChartRose,
+    ),
+)
+
 private fun look(themeId: String?, dark: Boolean): Look = when (themeId) {
     "theme_ocean" -> if (dark) BlueDark else BlueLight
     "theme_white" -> White
     "theme_black" -> Black
+    "theme_gold" -> GoldLook
+    "theme_emerald" -> EmeraldLook
     else -> if (dark) RitmoDark else RitmoLight
 }
+
+/** Temas de uma cor só: neles a escolha entre claro e escuro não muda nada. */
+val FixedModeThemes = setOf("theme_white", "theme_black", "theme_gold", "theme_emerald")
 
 /** Amostras mostradas na loja para o usuário ver o tema antes de comprar. */
 val ThemeSwatches = mapOf(
@@ -340,6 +435,8 @@ val ThemeSwatches = mapOf(
     "theme_ocean" to listOf(NightBlue, Blue, Color.White),
     "theme_white" to listOf(Color.White, Purple, Ink),
     "theme_black" to listOf(Color.Black, Mint, Color.White),
+    "theme_gold" to listOf(Walnut, Gold, Cream),
+    "theme_emerald" to listOf(Pine, Emerald, Mist),
 )
 
 @OptIn(ExperimentalTextApi::class)

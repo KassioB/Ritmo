@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -64,6 +66,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.ritmo.app.data.Objective
 import com.ritmo.app.domain.Difficulty
 import com.ritmo.app.domain.Period
+import com.ritmo.app.domain.Plan
 import com.ritmo.app.domain.Streak
 import com.ritmo.app.domain.clock
 import com.ritmo.app.domain.withReminder
@@ -112,6 +115,8 @@ fun ObjectiveEditor(
     objective: Objective?,
     streak: Streak?,
     today: Long,
+    plan: Plan,
+    onReminderLimit: () -> Unit,
     onSave: (Objective) -> Unit,
     onArchive: (Objective) -> Unit,
     onClose: () -> Unit,
@@ -217,7 +222,10 @@ fun ObjectiveEditor(
             }
         }
 
-        SectionLabel("Lembretes", "Adicione quantos horários quiser.")
+        SectionLabel(
+            "Lembretes",
+            plan.maxRemindersPerObjective?.let { "Até $it horários no plano grátis." } ?: "Adicione quantos horários quiser.",
+        )
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -230,7 +238,11 @@ fun ObjectiveEditor(
                     onRemove = { reminders = reminders - minutes },
                 )
             }
-            AddReminderChip { editingReminder = NEW_REMINDER }
+            if (plan.canAddReminder(reminders.size)) {
+                AddReminderChip("Adicionar lembrete", Icons.Rounded.Add) { editingReminder = NEW_REMINDER }
+            } else {
+                AddReminderChip("Mais lembretes no Pro", Icons.Rounded.Lock, onReminderLimit)
+            }
         }
         if (reminders.isNotEmpty()) ReminderNotices()
 
@@ -324,7 +336,7 @@ private fun ReminderChip(minutes: Int, accent: Color, onEdit: () -> Unit, onRemo
 }
 
 @Composable
-private fun AddReminderChip(onClick: () -> Unit) {
+private fun AddReminderChip(text: String, icon: ImageVector, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Row(
         Modifier
@@ -334,9 +346,9 @@ private fun AddReminderChip(onClick: () -> Unit) {
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Rounded.Add, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(4.dp))
-        Text("Adicionar lembrete", color = scheme.primary, style = MaterialTheme.typography.titleSmall)
+        Text(text, color = scheme.primary, style = MaterialTheme.typography.titleSmall)
     }
 }
 

@@ -44,7 +44,12 @@ object Streaks {
      * um bloqueio usado depois: a falha vira dia protegido, que mantém o streak sem somar. Só
      * serve para um tropeço recente; uma ausência maior que a janela fica como está.
      */
-    fun repairable(records: List<DayRecord>, today: Long, todayComplete: Boolean): StreakRepair? {
+    fun repairable(
+        records: List<DayRecord>,
+        today: Long,
+        todayComplete: Boolean,
+        windowDays: Int = REPAIR_WINDOW_DAYS,
+    ): StreakRepair? {
         val closed = records.filter { it.day < today }
             .groupBy { it.day }
             .toSortedMap()
@@ -55,7 +60,7 @@ object Streaks {
             .takeLastWhile { (_, outcome) -> outcome != DayStatus.DONE }
             .filter { (_, outcome) -> outcome == DayStatus.MISSED }
             .map { (day, _) -> day }
-        if (gap.first() < today - REPAIR_WINDOW_DAYS) return null
+        if (gap.first() < today - windowDays) return null
 
         val repaired = records.map {
             if (it.day in gap && it.status == DayStatus.MISSED) it.copy(status = DayStatus.FROZEN) else it

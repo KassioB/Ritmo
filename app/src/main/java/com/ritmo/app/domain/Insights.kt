@@ -3,6 +3,7 @@ package com.ritmo.app.domain
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.temporal.TemporalAdjusters
+import kotlin.math.roundToInt
 
 /** Tudo que aconteceu em um dia. [pending] só existe em hoje: o dia ainda não fechou. */
 data class DaySummary(
@@ -48,6 +49,9 @@ data class Bucket(
 }
 
 /** Parte do programado que foi feita em um recorte: um objetivo, um dia da semana, um turno. */
+/** Um padrão do período e o que fazer com ele. */
+data class Tip(val title: String, val advice: String)
+
 data class Score(val title: String, val done: Int, val total: Int) {
     val rate get() = if (total == 0) 0f else done.toFloat() / total
 }
@@ -105,6 +109,39 @@ data class Report(
  */
 object Insights {
     const val MIN_LAPSE_DAYS = 2
+
+    private const val MAX_TIPS = 3
+
+    /** Menos tarefas que isto ainda é acaso, não padrão. */
+    private const val MIN_TIP_SAMPLE = 3
+    private const val WEAK_RATE = 0.7f
+    private const val HARD_WEAK_RATE = 0.6f
+    private const val CLEAR_GAP = 0.15f
+
+    /** Conselhos tirados do próprio período, do que mais pesa para o mais geral. */
+    fun tips(report: Report): List<Tip> {
+        val tips = buildList {
+            report.byObjective.lastOrNull()?.takeIf { it.total >= MIN_TIP_SAMPLE && it.rate < WEAK_RATE }?.let {
+                add(Tip("\"${it.title}\" é o que mais escapa (${percent(it.rate)})", "Tente ligá-lo a algo que você já faz todo dia."))
+            }
+            report.worstWeekday?.takeIf { report.range != Range.WEEK && it.rate < WEAK_RATE }?.let {
+                add(Tip("${it.title} é seu dia mais fraco (${percent(it.rate)})", "Um lembrete a mais nesse dia pode ajudar."))
+            }
+            val turns = report.byPeriod.filter { it.title != Period.ANYTIME.label && it.total >= MIN_TIP_SAMPLE }
+            val bestTurn = turns.maxByOrNull { it.rate }
+            val worstTurn = turns.minByOrNull { it.rate }
+            if (bestTurn != null && worstTurn != null && bestTurn.rate - worstTurn.rate >= CLEAR_GAP) {
+                add(Tip("${bestTurn.title} é seu melhor turno (${percent(bestTurn.rate)})", "Deixe para ele o que mais importa."))
+            }
+            val hard = report.byDifficulty.firstOrNull { it.title == Difficulty.HARD.label }
+            if (hard != null && hard.total >= MIN_TIP_SAMPLE && hard.rate < HARD_WEAK_RATE) {
+                add(Tip("Os objetivos difíceis estão em ${percent(hard.rate)}", "Dividir em passos menores costuma ajudar."))
+            }
+        }
+        return tips.take(MAX_TIPS).ifEmpty { listOf(Tip("Nenhum ponto fraco claro", "Seu ritmo está equilibrado neste período.")) }
+    }
+
+    private fun percent(rate: Float) = "${(rate * 100).roundToInt()}%"
 
     private val WeekdayNames = mapOf(
         DayOfWeek.MONDAY to "Segunda",

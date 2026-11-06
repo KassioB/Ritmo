@@ -75,6 +75,8 @@ fun ListDetailScreen(
     row: ListRow,
     onBack: () -> Unit,
     onToggle: (Long) -> Unit,
+    canAdd: Boolean,
+    onLimit: () -> Unit,
     onAdd: (String, Difficulty) -> Unit,
     onUpdateItem: (ChecklistItem) -> Unit,
     onDeleteItem: (Long) -> Unit,
@@ -182,7 +184,7 @@ fun ListDetailScreen(
                 }
             }
 
-            AddItemBar(accent, onAdd)
+            if (canAdd) AddItemBar(accent, onAdd) else ItemLimitBar(onLimit)
         }
     }
 
@@ -262,6 +264,27 @@ private fun DoneHeader(count: Int, expanded: Boolean, onClick: () -> Unit) {
             if (expanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
             contentDescription = if (expanded) "Recolher concluídos" else "Mostrar concluídos",
         )
+    }
+}
+
+/** Toma o lugar do campo de adicionar: marcar, editar e apagar continuam normais. */
+@Composable
+private fun ItemLimitBar(onLimit: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .navigationBarsPadding()
+            .padding(start = 16.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "Lista cheia no plano grátis",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onLimit) { Text("Ver o Pro") }
     }
 }
 

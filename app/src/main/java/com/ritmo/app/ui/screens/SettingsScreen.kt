@@ -1,6 +1,9 @@
 package com.ritmo.app.ui.screens
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -47,7 +50,9 @@ import com.ritmo.app.data.Settings
 import com.ritmo.app.domain.Mood
 import com.ritmo.app.domain.Pet
 import com.ritmo.app.domain.Pets
+import com.ritmo.app.domain.Plan
 import com.ritmo.app.domain.Shop
+import com.ritmo.app.domain.ShopItem
 import com.ritmo.app.domain.ShopKind
 import com.ritmo.app.domain.ThemeMode
 import com.ritmo.app.domain.clock
@@ -57,14 +62,20 @@ import com.ritmo.app.ui.components.ChoiceTile
 import com.ritmo.app.ui.components.GroupCard
 import com.ritmo.app.ui.components.Mascot
 import com.ritmo.app.ui.components.PageTopBar
+import com.ritmo.app.ui.theme.FixedModeThemes
+import java.time.LocalDate
 
 private const val DEFAULT_THEME_NAME = "Ritmo"
+private const val THEMES_PER_ROW = 3
+private const val LOCKED_IN_SHOP = "Bloqueado, disponível na loja"
 
 @Composable
 fun SettingsScreen(
     state: UiState,
     onChange: ((Settings) -> Settings) -> Unit,
     onOpenShop: () -> Unit,
+    onOpenPro: (String) -> Unit,
+    onExport: (Uri) -> Unit,
     onBack: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -83,9 +94,11 @@ fun SettingsScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                AppearanceCard(state, onChange, onOpenShop)
+                PlanCard(state.plan) { onOpenPro(ProReason.NONE) }
+                AppearanceCard(state, onChange, onOpenShop, onOpenPro)
                 RemindersCard(settings, onChange) { pickingAlert = true }
                 PreferencesCard(settings, onChange)
+                DataCard(state.plan, onExport, onOpenPro)
                 AboutCard()
             }
         }
@@ -114,15 +127,25 @@ private fun Label(text: String) {
     )
 }
 
+@Composable
+private fun PlanCard(plan: Plan, onOpen: () -> Unit) {
+    if (plan.isPro) {
+        ProPromo("Ritmo Pro ativo", "Limites liberados e moedas em dobro.", onOpen)
+    } else {
+        ProPromo("Plano grátis", "Conheça o Pro: sem limites e com mais proteção para o streak.", onOpen)
+    }
+}
+
 /** Temas e pets ainda não comprados ficam visíveis, com o cadeado, e levam à loja. */
 @Composable
 private fun AppearanceCard(
     state: UiState,
     onChange: ((Settings) -> Settings) -> Unit,
     onOpenShop: () -> Unit,
+    onOpenPro: (String) -> Unit,
 ) {
     val settings = state.settings
-    val fixedMode = settings.themeId == "theme_white" || settings.themeId == "theme_black"
+    val fixedMode = settings.themeId in FixedModeThemes
     GroupCard(title = "Aparência") {
         Label("Modo")
         Row(
@@ -149,22 +172,23 @@ private fun AppearanceCard(
         }
 
         Label("Tema")
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        val themes = listOf<ShopItem?>(null) + Shop.items.filter { it.kind == ShopKind.THEME }
+        Column(
+            Modifier.padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            PickerTile(DEFAULT_THEME_NAME, settings.themeId == null, false, Modifier.weight(1f), {
-                onChange { it.copy(themeId = null) }
-            }) { Swatches("theme_default") }
-            Shop.items.filter { it.kind == ShopKind.THEME }.forEach { item ->
-                val owned = item.id in state.owned
-                PickerTile(
-                    item.name.removePrefix("Tema "),
-                    settings.themeId == item.id,
-                    !owned,
-                    Modifier.weight(1f),
-                    { if (owned) onChange { it.copy(themeId = item.id) } else onOpenShop() },
-                ) { Swatches(item.id) }
+            themes.chunked(THEMES_PER_ROW).forEach { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { item ->
+                        if (item == null) {
+                            PickerTile(DEFAULT_THEME_NAME, settings.themeId == null, null, Modifier.weight(1f), {
+                                onChange { it.copy(themeId = null) }
+                            }) { Swatches("theme_default") }
+                        } else {
+                            ThemeTile(item, state, onChange, onOpenShop, onOpenPro, Modifier.weight(1f))
+                        }
+                    }
+                }
             }
         }
 
@@ -180,6 +204,30 @@ private fun AppearanceCard(
 }
 
 @Composable
+private fun ThemeTile(
+    item: ShopItem,
+    state: UiState,
+    onChange: ((Settings) -> Settings) -> Unit,
+    onOpenShop: () -> Unit,
+    onOpenPro: (String) -> Unit,
+    modifier: Modifier,
+) {
+    val available = item.id in state.owned || (item.proOnly && state.plan.isPro)
+    val lock = when {
+        available -> null
+        item.proOnly -> "Bloqueado, disponível no Pro"
+        else -> LOCKED_IN_SHOP
+    }
+    PickerTile(item.name.removePrefix("Tema "), state.themeId == item.id, lock, modifier, {
+        when {
+            available -> onChange { it.copy(themeId = item.id) }
+            item.proOnly -> onOpenPro(ProReason.THEME)
+            else -> onOpenShop()
+        }
+    }) { Swatches(item.id) }
+}
+
+@Composable
 private fun PetTile(
     pet: Pet,
     state: UiState,
@@ -188,7 +236,7 @@ private fun PetTile(
     modifier: Modifier,
 ) {
     val available = pet.id == null || pet.id in state.owned
-    PickerTile(pet.name, state.petId == pet.id, !available, modifier, {
+    PickerTile(pet.name, state.petId == pet.id, LOCKED_IN_SHOP.takeUnless { available }, modifier, {
         if (available) onChange { it.copy(petId = pet.id) } else onOpenShop()
     }) {
         Mascot(pet.id, maxOf(state.stage.index, 1), Mood.HAPPY, sizeDp = 46.dp)
@@ -199,7 +247,7 @@ private fun PetTile(
 private fun PickerTile(
     name: String,
     selected: Boolean,
-    locked: Boolean,
+    lock: String?,
     modifier: Modifier,
     onClick: () -> Unit,
     preview: @Composable () -> Unit,
@@ -218,10 +266,10 @@ private fun PickerTile(
         Box(Modifier.height(46.dp), contentAlignment = Alignment.Center) { preview() }
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (locked) {
+            if (lock != null) {
                 Icon(
                     Icons.Rounded.Lock,
-                    contentDescription = "Bloqueado, disponível na loja",
+                    contentDescription = lock,
                     tint = scheme.onSurfaceVariant,
                     modifier = Modifier.size(12.dp),
                 )
@@ -325,6 +373,23 @@ private fun PreferencesCard(settings: Settings, onChange: ((Settings) -> Setting
             }
         }
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+/** O próprio sistema pergunta onde salvar, então o app não precisa de permissão de arquivos. */
+@Composable
+private fun DataCard(plan: Plan, onExport: (Uri) -> Unit, onOpenPro: (String) -> Unit) {
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { target ->
+        if (target != null) onExport(target)
+    }
+    GroupCard(title = "Dados") {
+        Spacer(Modifier.height(4.dp))
+        if (plan.isPro) {
+            ActionLine("Histórico em planilha", "Exportar") { picker.launch("ritmo-historico-${LocalDate.now()}.csv") }
+        } else {
+            ActionLine("Histórico em planilha", "Pro") { onOpenPro(ProReason.EXPORT) }
+        }
+        Spacer(Modifier.height(4.dp))
     }
 }
 
