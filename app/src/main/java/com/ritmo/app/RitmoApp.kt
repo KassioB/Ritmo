@@ -2,6 +2,7 @@ package com.ritmo.app
 
 import android.app.Application
 import com.ritmo.app.data.AccountRepository
+import com.ritmo.app.data.Cloud
 import com.ritmo.app.data.RitmoDatabase
 import com.ritmo.app.data.RitmoRepository
 import com.ritmo.app.notifications.PetIcon
@@ -10,7 +11,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 
 class RitmoApp : Application() {
@@ -19,11 +22,18 @@ class RitmoApp : Application() {
 
     private val database by lazy { RitmoDatabase.create(this) }
     val repository by lazy { RitmoRepository(database) }
-    val accounts by lazy { AccountRepository(database) }
+    val accounts by lazy { AccountRepository(database, repository) }
 
+    @OptIn(FlowPreview::class)
     override fun onCreate() {
         super.onCreate()
+        Cloud.init(this)
         Reminders.createChannel(this)
+        scope.launch {
+            accounts.reconcile()
+            // Espera a pessoa parar de mexer por um instante e sobe o progresso para a conta.
+            repository.snapshot.debounce(SYNC_DELAY_MS).collect { accounts.sync() }
+        }
     }
 
     /**
@@ -44,5 +54,6 @@ class RitmoApp : Application() {
 
     private companion object {
         const val ICON_SYNC_DELAY_MS = 3_000L
+        const val SYNC_DELAY_MS = 2_000L
     }
 }

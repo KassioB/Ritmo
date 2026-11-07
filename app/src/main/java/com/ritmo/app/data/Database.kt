@@ -93,15 +93,15 @@ data class Settings(
 )
 
 /**
- * Conta deste aparelho. Só existe uma: [id] é sempre 0, como em [Settings]. Sair não apaga a linha,
- * só desliga [signedIn]; os dados do app continuam no banco, vinculados a ela.
+ * Cópia local da conta conectada (a conta de verdade fica no Firebase). Só existe uma: [id] é sempre 0,
+ * como em [Settings]. Sair apaga a linha junto com o progresso local, que continua guardado na conta.
  */
 @Entity(tableName = "account")
 data class Account(
     @PrimaryKey val id: Int = 0,
     val name: String,
     val email: String,
-    /** Hash de [com.ritmo.app.domain.Passwords]; nulo se outro serviço autenticar, como o Google. */
+    /** Sobra da versão em que a senha ficava no aparelho; hoje sempre nulo, quem confere é o Firebase. */
     val password: String?,
     val signedIn: Boolean,
 )

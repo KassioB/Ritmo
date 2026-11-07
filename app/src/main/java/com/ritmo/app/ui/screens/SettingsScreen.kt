@@ -24,7 +24,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -47,7 +46,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import com.ritmo.app.data.Account
 import com.ritmo.app.data.Settings
 import com.ritmo.app.domain.Mood
 import com.ritmo.app.domain.Pet
@@ -77,7 +75,7 @@ fun SettingsScreen(
     onOpenShop: () -> Unit,
     onOpenPro: (String) -> Unit,
     onExport: (Uri) -> Unit,
-    onSignOut: () -> Unit,
+    account: AccountActions,
     onBack: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -96,7 +94,7 @@ fun SettingsScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                state.account?.let { AccountCard(it, onSignOut) }
+                state.account?.let { AccountCard(it, account) }
                 PlanCard(state.plan) { onOpenPro(ProReason.NONE) }
                 AppearanceCard(state, onChange, onOpenShop, onOpenPro)
                 RemindersCard(settings, onChange) { pickingAlert = true }
@@ -128,36 +126,6 @@ private fun Label(text: String) {
         style = MaterialTheme.typography.labelLarge,
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
     )
-}
-
-@Composable
-private fun AccountCard(account: Account, onSignOut: () -> Unit) {
-    var confirming by rememberSaveable { mutableStateOf(false) }
-    GroupCard(title = "Conta") {
-        Row(
-            Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(account.name, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    account.email,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            TextButton(onClick = { confirming = true }) { Text("Sair") }
-        }
-    }
-    if (confirming) {
-        AlertDialog(
-            onDismissRequest = { confirming = false },
-            title = { Text("Sair da conta?") },
-            text = { Text("Seus dados continuam neste aparelho, mas os lembretes param até você entrar de novo.") },
-            confirmButton = { TextButton(onClick = onSignOut) { Text("Sair") } },
-            dismissButton = { TextButton(onClick = { confirming = false }) { Text("Cancelar") } },
-        )
-    }
 }
 
 @Composable

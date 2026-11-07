@@ -8,6 +8,12 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// O arquivo do projeto Firebase fica fora do git. Sem ele o app compila, mas o login fica indisponível,
+// a não ser que a compilação aponte para os emuladores do Firebase (veja FIREBASE_EMULATOR_HOST).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // A chave e a senha ficam juntas fora do projeto. Sem elas, o APK de release sai sem assinatura.
 val signing = Properties().apply {
     File(System.getProperty("user.home"), ".ritmo/signing.properties")
@@ -27,6 +33,9 @@ android {
         versionCode = 6
         versionName = "0.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Só para testes: -Pritmo.firebaseEmulator=10.0.2.2 liga o app aos emuladores locais do Firebase.
+        val emulatorHost = providers.gradleProperty("ritmo.firebaseEmulator").getOrElse("")
+        buildConfigField("String", "FIREBASE_EMULATOR_HOST", "\"$emulatorHost\"")
     }
 
     signingConfigs {
@@ -52,7 +61,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
     sourceSets {
         // Os testes de migração leem os esquemas exportados pelo Room.
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
@@ -89,6 +101,12 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.kotlinx.coroutines.play.services)
+    // O Firebase traz um fragment antigo, que quebra o pedido de permissão de notificações.
+    implementation(libs.androidx.fragment)
     debugImplementation(libs.compose.ui.tooling)
     testImplementation(libs.junit)
     androidTestImplementation(libs.room.testing)

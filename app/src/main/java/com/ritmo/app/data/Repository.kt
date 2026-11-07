@@ -38,9 +38,6 @@ data class Snapshot(
 ) {
     val signedIn get() = account?.signedIn == true
 
-    /** Diferente de não ter conta: quem acabou de atualizar o app ainda não criou a sua. */
-    val signedOut get() = account?.signedIn == false
-
     val xp get() = ledger.sumOf { it.xp }
     val coins get() = ledger.sumOf { it.coins }
     val freezes get() = ledger.sumOf { it.freezes }

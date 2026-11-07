@@ -7,3 +7,8 @@ local.properties
 *.apk
 *.keystore
 captures/
+# Configuração do projeto Firebase: fica só na máquina de quem compila.
+app/google-services.json
+__pycache__/
+# Logs dos emuladores do Firebase.
+*-debug.log

@@ -121,7 +121,7 @@ class MigrationTest {
         try {
             val state = runBlocking { RitmoRepository(database).load() }!!
             assertNull(state.account)
-            assertEquals(false, state.signedOut)
+            assertEquals(false, state.signedIn)
             assertEquals(true, state.settings.isPro)
             assertEquals("theme_gold", state.settings.themeId)
             assertEquals("pet_luz", state.settings.petId)

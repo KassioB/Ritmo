@@ -43,6 +43,7 @@ import com.ritmo.app.ui.components.NavItem
 import com.ritmo.app.ui.components.RewardPill
 import com.ritmo.app.ui.components.RitmoBottomBar
 import com.ritmo.app.ui.components.RitmoHeader
+import com.ritmo.app.ui.screens.AccountActions
 import com.ritmo.app.ui.screens.AuthScreen
 import com.ritmo.app.ui.screens.DashboardScreen
 import com.ritmo.app.ui.screens.ListDetailScreen
@@ -83,7 +84,7 @@ fun RitmoRoot(viewModel: RitmoViewModel = viewModel()) {
                     current == null -> Unit
                     // Sair da conta tira Home da tela e descarta o que estava aberto nela.
                     current.signedIn -> Home(current, viewModel)
-                    else -> AuthScreen(current, viewModel::signUp, viewModel::signIn, viewModel::resetPassword)
+                    else -> AuthScreen(current, viewModel::signUp, viewModel::signIn, viewModel::sendPasswordReset)
                 }
             }
         }
@@ -236,7 +237,14 @@ private fun Home(current: UiState, viewModel: RitmoViewModel) {
                 },
                 onOpenPro = { proReason = it },
                 onExport = viewModel::exportHistory,
-                onSignOut = viewModel::signOut,
+                account = remember(viewModel) {
+                    AccountActions(
+                        viewModel::updateName,
+                        viewModel::changePassword,
+                        viewModel::signOut,
+                        viewModel::deleteAccount,
+                    )
+                },
                 onBack = { settingsOpen = false },
             )
         }

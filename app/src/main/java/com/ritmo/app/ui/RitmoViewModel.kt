@@ -285,8 +285,9 @@ class RitmoViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { finishAuth(accounts.signIn(email, password), onFailure) }
     }
 
-    fun resetPassword(email: String, password: String, onFailure: (AuthFailure) -> Unit) {
-        viewModelScope.launch { finishAuth(accounts.resetPassword(email, password), onFailure) }
+    /** [onResult] recebe nulo quando o e-mail de recuperação foi pedido. */
+    fun sendPasswordReset(email: String, onResult: (AuthFailure?) -> Unit) {
+        viewModelScope.launch { onResult(accounts.sendPasswordReset(email)) }
     }
 
     /** Entrar recomeça os lembretes de agora: os horários que passaram com a conta fora não contam. */
@@ -299,10 +300,27 @@ class RitmoViewModel(application: Application) : AndroidViewModel(application) {
         syncReminders(edited = true)
     }
 
-    fun signOut() {
+    /** Só sai com o progresso salvo na conta; se faltar internet, [onFailure] explica e nada muda. */
+    fun signOut(onFailure: (AuthFailure) -> Unit) {
         viewModelScope.launch {
-            accounts.signOut()
-            syncReminders(edited = true)
+            val failure = accounts.signOut(currentDay())
+            if (failure != null) onFailure(failure) else syncReminders(edited = true)
+        }
+    }
+
+    fun updateName(name: String, onResult: (AuthFailure?) -> Unit) {
+        viewModelScope.launch { onResult(accounts.updateName(name)) }
+    }
+
+    fun changePassword(current: String, new: String, onResult: (AuthFailure?) -> Unit) {
+        viewModelScope.launch { onResult(accounts.changePassword(current, new)) }
+    }
+
+    fun deleteAccount(password: String, onResult: (AuthFailure?) -> Unit) {
+        viewModelScope.launch {
+            val failure = accounts.deleteAccount(password, currentDay())
+            if (failure == null) syncReminders(edited = true)
+            onResult(failure)
         }
     }
 
