@@ -115,6 +115,8 @@ class Backup(private val db: RitmoDatabase) {
             "settings",
             "checklists",
             "checklist_items",
+            "matrix_tasks",
+            "focus_sessions",
         )
     }
 }

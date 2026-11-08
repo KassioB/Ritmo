@@ -18,7 +18,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.ritmo.app.domain.Difficulty
 import com.ritmo.app.domain.DayRecord
 import com.ritmo.app.domain.DayStatus
+import com.ritmo.app.domain.Focus
+import com.ritmo.app.domain.FocusMode
+import com.ritmo.app.domain.HomeTabs
 import com.ritmo.app.domain.Period
+import com.ritmo.app.domain.Quadrant
+import com.ritmo.app.domain.Screen
 import com.ritmo.app.domain.ReminderPlan
 import com.ritmo.app.domain.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -90,7 +95,13 @@ data class Settings(
     val hapticsEnabled: Boolean = true,
     val weekStartsMonday: Boolean = false,
     val isPro: Boolean = false,
-)
+    /** Telas do rodapé, em ordem; vazio vale o padrão. Leia por [tabs]. */
+    val homeTabs: String = "",
+    val focusMinutes: Int = Focus.DEFAULT_FOCUS,
+    val breakMinutes: Int = Focus.DEFAULT_BREAK,
+) {
+    val tabs: List<Screen> get() = HomeTabs.parse(homeTabs)
+}
 
 /**
  * Cópia local da conta conectada (a conta de verdade fica no Firebase). Só existe uma: [id] é sempre 0,
@@ -124,6 +135,29 @@ data class ChecklistItem(
     val difficulty: Difficulty,
     /** Dia em que foi marcado; nulo enquanto estiver pendente. */
     val doneDay: Long? = null,
+)
+
+/** Uma tarefa da matriz de Eisenhower. */
+@Entity(tableName = "matrix_tasks")
+data class MatrixTask(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    val quadrant: Quadrant,
+    val createdDay: Long,
+    /** Dia em que foi concluída; nulo enquanto estiver pendente. */
+    val doneDay: Long? = null,
+)
+
+/** Um Pomodoro concluído ou um tempo de cronômetro encerrado. */
+@Entity(tableName = "focus_sessions", indices = [Index("day")])
+data class FocusSession(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val day: Long,
+    val startedAt: Long,
+    val seconds: Int,
+    val mode: FocusMode,
+    /** No que a pessoa focou, se escolheu algo. */
+    val title: String? = null,
 )
 
 class Converters {
@@ -237,6 +271,30 @@ interface RitmoDao {
 
     @Query("DELETE FROM checklist_items WHERE id = :id")
     suspend fun deleteItem(id: Long)
+
+    @Query("SELECT * FROM matrix_tasks ORDER BY id")
+    fun observeTasks(): Flow<List<MatrixTask>>
+
+    @Query("SELECT * FROM matrix_tasks ORDER BY id")
+    suspend fun tasks(): List<MatrixTask>
+
+    @Query("SELECT * FROM matrix_tasks WHERE id = :id")
+    suspend fun task(id: Long): MatrixTask?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveTask(task: MatrixTask): Long
+
+    @Query("DELETE FROM matrix_tasks WHERE id = :id")
+    suspend fun deleteTask(id: Long)
+
+    @Query("SELECT * FROM focus_sessions ORDER BY startedAt")
+    fun observeSessions(): Flow<List<FocusSession>>
+
+    @Query("SELECT * FROM focus_sessions ORDER BY startedAt")
+    suspend fun sessions(): List<FocusSession>
+
+    @Insert
+    suspend fun addSession(session: FocusSession): Long
 }
 
 /**
@@ -322,6 +380,29 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+/** Versão 6: surgem a matriz de Eisenhower, o foco (Pomodoro e cronômetro) e o rodapé personalizável. */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `settings` ADD COLUMN `homeTabs` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `settings` ADD COLUMN `focusMinutes` INTEGER NOT NULL DEFAULT ${Focus.DEFAULT_FOCUS}")
+        db.execSQL("ALTER TABLE `settings` ADD COLUMN `breakMinutes` INTEGER NOT NULL DEFAULT ${Focus.DEFAULT_BREAK}")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `matrix_tasks` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, " +
+                "`quadrant` TEXT NOT NULL, `createdDay` INTEGER NOT NULL, `doneDay` INTEGER)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `focus_sessions` (" +
+                "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `day` INTEGER NOT NULL, " +
+                "`startedAt` INTEGER NOT NULL, `seconds` INTEGER NOT NULL, `mode` TEXT NOT NULL, `title` TEXT)",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_focus_sessions_day` ON `focus_sessions` (`day`)")
+    }
+}
+
+/** Em ordem: propriedades de topo inicializam na ordem do arquivo. */
+val MIGRATIONS = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+
 @Database(
     entities = [
         Objective::class,
@@ -332,8 +413,10 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         Checklist::class,
         ChecklistItem::class,
         Account::class,
+        MatrixTask::class,
+        FocusSession::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -343,7 +426,7 @@ abstract class RitmoDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): RitmoDatabase =
             Room.databaseBuilder(context, RitmoDatabase::class.java, "ritmo.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(*MIGRATIONS)
                 .build()
     }
 }

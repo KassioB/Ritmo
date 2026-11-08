@@ -9,10 +9,13 @@ import com.ritmo.app.domain.DayStatus
 import com.ritmo.app.domain.Difficulty
 import com.ritmo.app.domain.Evolution
 import com.ritmo.app.domain.EvolutionStage
+import com.ritmo.app.domain.FinishedPhase
+import com.ritmo.app.domain.Focus
 import com.ritmo.app.domain.PetFeeling
 import com.ritmo.app.domain.PetMood
 import com.ritmo.app.domain.Plan
 import com.ritmo.app.domain.Progression
+import com.ritmo.app.domain.Quadrant
 import com.ritmo.app.domain.Shop
 import com.ritmo.app.domain.ShopItem
 import com.ritmo.app.domain.ShopKind
@@ -22,8 +25,10 @@ import com.ritmo.app.domain.Streaks
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterNotNull
+import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 
 /** Foto do banco; todo o estado derivado (streaks, nível, saldo) é calculado a partir dela. */
 data class Snapshot(
@@ -35,6 +40,8 @@ data class Snapshot(
     val lists: List<Checklist> = emptyList(),
     val items: List<ChecklistItem> = emptyList(),
     val account: Account? = null,
+    val tasks: List<MatrixTask> = emptyList(),
+    val sessions: List<FocusSession> = emptyList(),
 ) {
     val signedIn get() = account?.signedIn == true
 
@@ -103,6 +110,8 @@ data class Snapshot(
         const val LIST_DONE = "list-done:"
         const val STREAK_REPAIR = "streak-repair:"
         const val PRO_FREEZE = "pro-freeze:"
+        const val TASK = "task:"
+        const val FOCUS = "focus:"
         private val PAID = listOf(PURCHASE, FREEZE_BOUGHT, STREAK_REPAIR)
     }
 }
@@ -137,14 +146,17 @@ class RitmoRepository(private val db: RitmoDatabase) {
         Snapshot(objectives, records.map { it.toDomain() }, ledger, unlocked, settings)
     }
 
-    val snapshot: Flow<Snapshot> = combine(
-        routine,
+    private val extras: Flow<(Snapshot) -> Snapshot> = combine(
         dao.observeLists(),
         dao.observeItems(),
         dao.observeAccount(),
-    ) { state, lists, items, account ->
-        state.copy(lists = lists, items = items, account = account)
+        dao.observeTasks(),
+        dao.observeSessions(),
+    ) { lists, items, account, tasks, sessions ->
+        { state: Snapshot -> state.copy(lists = lists, items = items, account = account, tasks = tasks, sessions = sessions) }
     }
+
+    val snapshot: Flow<Snapshot> = combine(routine, extras) { state, fill -> fill(state) }
 
     suspend fun load(): Snapshot? {
         val settings = dao.settings() ?: return null
@@ -157,6 +169,8 @@ class RitmoRepository(private val db: RitmoDatabase) {
             dao.lists(),
             dao.items(),
             dao.account(),
+            dao.tasks(),
+            dao.sessions(),
         )
     }
 
@@ -264,6 +278,44 @@ class RitmoRepository(private val db: RitmoDatabase) {
             dao.deleteLedger(itemKey(item.id, today))
         }
         dao.deleteLedger(listDoneKey(listId, today))
+    }
+
+    suspend fun addTask(title: String, quadrant: Quadrant, today: Long) {
+        dao.saveTask(MatrixTask(title = title, quadrant = quadrant, createdDay = today))
+    }
+
+    suspend fun updateTask(task: MatrixTask) {
+        dao.saveTask(task)
+    }
+
+    /** Como nas listas: apagar não tira o XP já ganho. */
+    suspend fun deleteTask(taskId: Long) = dao.deleteTask(taskId)
+
+    /** Mesmo esquema dos itens de lista: o XP é do dia em que foi marcada, e desmarcar devolve. */
+    suspend fun toggleTask(taskId: Long, today: Long): ToggleOutcome = db.withTransaction {
+        val task = dao.task(taskId) ?: return@withTransaction ToggleOutcome()
+        val before = load() ?: return@withTransaction ToggleOutcome()
+        val key = "${Snapshot.TASK}$taskId:$today"
+        if (task.doneDay != null) {
+            dao.saveTask(task.copy(doneDay = null))
+            dao.deleteLedger(key)
+        } else {
+            dao.saveTask(task.copy(doneDay = today))
+            dao.addLedger(LedgerEntry(key, Progression.TASK_XP, day = today))
+        }
+        outcome(before, today)
+    }
+
+    /** Guarda a sessão de foco e o XP dela, no dia em que terminou. */
+    suspend fun recordFocus(finished: FinishedPhase, title: String?, today: Long): ToggleOutcome = db.withTransaction {
+        val before = load() ?: return@withTransaction ToggleOutcome()
+        val end = finished.startedAt + finished.millis
+        val day = Instant.ofEpochMilli(end).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay()
+        val seconds = (finished.millis / 1000).toInt()
+        val id = dao.addSession(FocusSession(day = day, startedAt = finished.startedAt, seconds = seconds, mode = finished.mode, title = title))
+        val xp = Focus.xpFor(seconds)
+        if (xp > 0) dao.addLedger(LedgerEntry("${Snapshot.FOCUS}$id", xp, day = day))
+        outcome(before, today)
     }
 
     /** Devolve as conquistas liberadas pela compra, ou `null` se ela não aconteceu. */

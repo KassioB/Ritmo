@@ -17,14 +17,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -47,10 +51,12 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.ritmo.app.data.Settings
+import com.ritmo.app.domain.HomeTabs
 import com.ritmo.app.domain.Mood
 import com.ritmo.app.domain.Pet
 import com.ritmo.app.domain.Pets
 import com.ritmo.app.domain.Plan
+import com.ritmo.app.domain.Screen
 import com.ritmo.app.domain.Shop
 import com.ritmo.app.domain.ShopItem
 import com.ritmo.app.domain.ShopKind
@@ -62,6 +68,8 @@ import com.ritmo.app.ui.components.ChoiceTile
 import com.ritmo.app.ui.components.GroupCard
 import com.ritmo.app.ui.components.Mascot
 import com.ritmo.app.ui.components.PageTopBar
+import com.ritmo.app.ui.components.icon
+import com.ritmo.app.ui.components.tint
 import java.time.LocalDate
 
 private const val DEFAULT_THEME_NAME = "Ritmo"
@@ -97,6 +105,7 @@ fun SettingsScreen(
                 state.account?.let { AccountCard(it, account) }
                 PlanCard(state.plan) { onOpenPro(ProReason.NONE) }
                 AppearanceCard(state, onChange, onOpenShop, onOpenPro)
+                FooterCard(settings, onChange)
                 RemindersCard(settings, onChange) { pickingAlert = true }
                 PreferencesCard(settings, onChange)
                 DataCard(state.plan, onExport, onOpenPro)
@@ -294,6 +303,110 @@ private fun SwitchLine(title: String, detail: String?, checked: Boolean, onChang
             }
         }
         Switch(checked, onChange)
+    }
+}
+
+/** Quais telas ficam no rodapé e em que ordem. A primeira é a que abre com o app. */
+@Composable
+private fun FooterCard(settings: Settings, onChange: ((Settings) -> Settings) -> Unit) {
+    val tabs = settings.tabs
+    var notice by remember { mutableStateOf<String?>(null) }
+    fun save(next: List<Screen>) {
+        notice = null
+        onChange { it.copy(homeTabs = HomeTabs.format(next)) }
+    }
+    GroupCard(title = "Telas do rodapé", trailing = "${tabs.size} de ${HomeTabs.MAX}") {
+        Text(
+            "Escolha o que você usa. A primeira da lista é a tela que abre com o app.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        (tabs + Screen.entries.filterNot { it in tabs }).forEach { screen ->
+            val index = tabs.indexOf(screen)
+            FooterLine(
+                screen = screen,
+                position = index.takeIf { it >= 0 }?.plus(1),
+                canMoveUp = index > 0,
+                canMoveDown = index in 0 until tabs.lastIndex,
+                onMove = { delta -> save(HomeTabs.move(tabs, screen, delta)) },
+                onToggle = {
+                    val next = HomeTabs.toggle(tabs, screen)
+                    if (next != null) {
+                        save(next)
+                    } else {
+                        notice = if (screen in tabs) {
+                            "O rodapé precisa de pelo menos ${HomeTabs.MIN} telas."
+                        } else {
+                            "Cabem até ${HomeTabs.MAX} telas. Tire uma para colocar esta."
+                        }
+                    }
+                },
+            )
+        }
+        notice?.let {
+            Text(
+                it,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
+        Text(
+            "Dashboard, Loja e Conquistas também abrem pelos números no topo da tela.",
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun FooterLine(
+    screen: Screen,
+    position: Int?,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMove: (Int) -> Unit,
+    onToggle: () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val tint = screen.tint()
+    Row(
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 2.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(tint.copy(alpha = if (position != null) 0.18f else 0.08f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                screen.icon,
+                contentDescription = null,
+                tint = if (position != null) tint else scheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                if (position == 1) "${screen.label} · abre o app" else screen.label,
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(screen.detail, color = scheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
+        if (position != null) {
+            IconButton(onClick = { onMove(-1) }, enabled = canMoveUp) {
+                Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Subir ${screen.label}")
+            }
+            IconButton(onClick = { onMove(1) }, enabled = canMoveDown) {
+                Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Descer ${screen.label}")
+            }
+        }
+        Switch(position != null, { onToggle() })
     }
 }
 

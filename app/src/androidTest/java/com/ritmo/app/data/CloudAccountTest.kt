@@ -36,9 +36,17 @@ class CloudAccountTest {
         device()
     }
 
+    /** Apaga o progresso e a conta de teste, para o emulador do Firebase não acumular lixo. */
     @After fun close() {
         if (!Cloud.available) return
-        runBlocking { FirebaseAuth.getInstance().currentUser?.delete()?.await() }
+        runBlocking {
+            val auth = FirebaseAuth.getInstance()
+            if (auth.currentUser == null) runCatching { auth.signInWithEmailAndPassword(email, password).await() }
+            auth.currentUser?.let { user ->
+                runCatching { FirebaseFirestore.getInstance().collection("users").document(user.uid).delete().await() }
+                user.delete().await()
+            }
+        }
         database.close()
     }
 

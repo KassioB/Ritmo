@@ -29,6 +29,9 @@ object Progression {
     /** Fechar uma lista rende o mesmo XP de um dia perfeito, mas nenhuma moeda. */
     const val LIST_COMPLETE_XP = PERFECT_DAY_XP
     const val MIN_ITEMS_FOR_LIST_BONUS = 2
+
+    /** Uma tarefa da matriz vale como um item fácil de lista, sem moedas. */
+    const val TASK_XP = 10
     const val STARTING_FREEZES = 1
     const val MAX_FREEZES = 2
 

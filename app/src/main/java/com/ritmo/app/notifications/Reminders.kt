@@ -200,6 +200,8 @@ class BootReceiver : BroadcastReceiver() {
                     Reminders.sync(context, state)
                     PetIcon.sync(context, state)
                 }
+                // O alarme do Pomodoro também se perde ao reiniciar: fecha o que acabou e arma de novo.
+                (context.applicationContext as RitmoApp).focus.settle()
             } finally {
                 pending.finish()
             }

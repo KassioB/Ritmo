@@ -24,6 +24,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".focus.FocusAlarmReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".notifications.PetIconReceiver"
             android:exported="false" />
 
