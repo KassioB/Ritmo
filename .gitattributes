@@ -1,0 +1,4 @@
+# Scripts e workflows rodam no Linux do GitHub Actions: precisam de quebra de linha LF.
+gradlew text eol=lf
+*.sh text eol=lf
+.github/** text eol=lf
