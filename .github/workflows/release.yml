@@ -1,0 +1,120 @@
+# Gera o APK assinado e publica um Release no GitHub a cada tag de versão (v0.7.0, v0.8.0...).
+#
+# Precisa destes Secrets no repositório (Settings > Secrets and variables > Actions):
+#   GOOGLE_SERVICES_JSON     conteúdo de app/google-services.json em base64
+#   RELEASE_KEYSTORE_BASE64  a chave de assinatura (.keystore) em base64
+#   RELEASE_STORE_PASSWORD   senha do keystore
+#   RELEASE_KEY_ALIAS        alias da chave
+#   RELEASE_KEY_PASSWORD     senha da chave
+#
+# A chave tem que ser sempre a mesma: um APK assinado com outra não atualiza o app já instalado.
+name: Release do APK
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag do release (ex.: v0.7.0). Precisa bater com o versionName do app."
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Conferir a versão
+        run: |
+          version=$(sed -nE 's/^ *versionName = "([^"]+)".*/\1/p' app/build.gradle.kts)
+          echo "versionName=$version, tag=$TAG"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::A tag $TAG não bate com o versionName $version em app/build.gradle.kts."
+            exit 1
+          fi
+
+      - name: Restaurar Firebase e chave de assinatura
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          for name in GOOGLE_SERVICES_JSON RELEASE_KEYSTORE_BASE64 RELEASE_STORE_PASSWORD RELEASE_KEY_ALIAS RELEASE_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Falta o secret $name. Veja o topo de .github/workflows/release.yml."
+              exit 1
+            fi
+          done
+          echo "$GOOGLE_SERVICES_JSON" | base64 -d > app/google-services.json
+          # O app/build.gradle.kts lê a assinatura de ~/.ritmo/signing.properties, como na máquina de quem compila.
+          mkdir -p "$HOME/.ritmo"
+          echo "$RELEASE_KEYSTORE_BASE64" | base64 -d > "$HOME/.ritmo/ritmo-release.keystore"
+          {
+            echo "storeFile=$HOME/.ritmo/ritmo-release.keystore"
+            echo "storePassword=$RELEASE_STORE_PASSWORD"
+            echo "keyAlias=$RELEASE_KEY_ALIAS"
+            echo "keyPassword=$RELEASE_KEY_PASSWORD"
+          } > "$HOME/.ritmo/signing.properties"
+
+      - name: Testes e APK
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleRelease
+
+      - name: Conferir a assinatura
+        run: |
+          apk=app/build/outputs/apk/release/app-release.apk
+          if [ ! -f "$apk" ]; then
+            echo "::error::O APK assinado não foi gerado (sem assinatura ele sairia como app-release-unsigned.apk)."
+            exit 1
+          fi
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$apksigner" verify --print-certs "$apk" | grep -E "Signer #1 certificate (DN|SHA-256)"
+          mkdir -p dist
+          cp "$apk" "dist/Ritmo-$TAG.apk"
+
+      - name: Publicar o release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<EOF
+          ## Como instalar
+
+          1. Baixe **Ritmo-$TAG.apk** abaixo, no celular Android (8.0 ou mais novo).
+          2. Abra o arquivo. Se o Android pedir, permita **instalar apps desconhecidos** para o navegador ou o gerenciador de arquivos.
+          3. Crie sua conta no app. Sua conta e seu progresso ficam salvos na nuvem e voltam sempre que você entrar, até em outro celular.
+
+          Quem já tem o Ritmo instalado por um APK destes pode instalar por cima: o progresso continua.
+          EOF
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "dist/Ritmo-$TAG.apk" --clobber
+          else
+            gh release create "$TAG" "dist/Ritmo-$TAG.apk" --title "Ritmo $TAG" --notes-file notes.md --verify-tag
+          fi
+
+      - name: Apagar os segredos do runner
+        if: always()
+        run: rm -f app/google-services.json "$HOME/.ritmo/ritmo-release.keystore" "$HOME/.ritmo/signing.properties"
