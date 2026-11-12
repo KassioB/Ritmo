@@ -10,7 +10,8 @@
 # Secrets (Settings → Secrets and variables → Actions):
 #   GOOGLE_SERVICES_JSON   o app/google-services.json, em texto ou em base64. Sem ele o login fica indisponível.
 #   RITMO_KEYSTORE_BASE64  a keystore de release em base64 (base64 -w0 sua.keystore)
-#   RITMO_STORE_PASSWORD, RITMO_KEY_ALIAS, RITMO_KEY_PASSWORD
+#   RITMO_STORE_PASSWORD, RITMO_KEY_PASSWORD
+# O alias da chave é "ritmo"; outro alias vai na variável (não secret) RITMO_KEY_ALIAS.
 #
 # A keystore tem que ser sempre a mesma: um APK assinado com outra não atualiza o app já instalado.
 # Por isso uma tag v* exige os dois secrets e falha sem eles. Pelo Run workflow, sem eles, sai um APK de
@@ -76,7 +77,8 @@ jobs:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
           KEYSTORE_BASE64: ${{ secrets.RITMO_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.RITMO_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.RITMO_KEY_ALIAS }}
+          # O alias não é segredo: como secret, o GitHub esconderia toda palavra "ritmo" dos logs.
+          KEY_ALIAS: ${{ vars.RITMO_KEY_ALIAS || 'ritmo' }}
           KEY_PASSWORD: ${{ secrets.RITMO_KEY_PASSWORD }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
@@ -119,7 +121,10 @@ jobs:
           ./gradlew --no-daemon :app:testDebugUnitTest
 
       - name: Compilar o APK
+        env:
+          CERT_SHA256: 53f26126d7d44c56d1bce5d9e0193b07c7ea4ffe8e7aa30d1a1e5eab0c65d368
         run: |
+          set -o pipefail
           if [ "$ASSINADO" = sim ]; then
             ./gradlew --no-daemon :app:assembleRelease
             APK=app/build/outputs/apk/release/app-release.apk
@@ -127,8 +132,15 @@ jobs:
               echo "::error::O APK de release não saiu assinado. Confira RITMO_STORE_PASSWORD, RITMO_KEY_ALIAS e RITMO_KEY_PASSWORD."
               exit 1
             fi
-            APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
-            "$APKSIGNER" verify --print-certs "$APK" | grep -E "Signer #1 certificate (DN|SHA-256)"
+            APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+            echo "apksigner: $APKSIGNER"
+            "$APKSIGNER" verify --print-certs "$APK" > assinatura.txt 2>&1 || { cat assinatura.txt; echo "::error::O APK não passou na verificação de assinatura."; exit 1; }
+            cat assinatura.txt
+            # A impressão digital da chave oficial é pública (está em todo APK). Se mudar, o app não atualiza.
+            if ! grep -qi "SHA-256 digest: $CERT_SHA256" assinatura.txt; then
+              echo "::error::O APK foi assinado com outra chave. Esperado SHA-256 $CERT_SHA256."
+              exit 1
+            fi
           else
             ./gradlew --no-daemon :app:assembleDebug
             APK=app/build/outputs/apk/debug/app-debug.apk
